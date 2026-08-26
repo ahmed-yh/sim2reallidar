@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+*.pt
+*.pth
+
+# Regenerated locally from data_prep/parse_recordings.py + split.py against
+# the raw scenario recordings -- not source, don't version 134MB+ of derived
+# arrays. See README "Reproducing data/" for the exact commands.
+data/
+
+# training artifacts
+outputs/
+runs/
+*.log
+
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
