@@ -101,7 +101,7 @@ class SetAbstraction(nn.Module):
         layers = []
         last = in_ch + 3
         for ch in mlp_channels:
-            layers += [nn.Conv2d(last, ch, 1), nn.BatchNorm2d(ch), nn.ReLU(inplace=True)]
+            layers += [nn.Conv2d(last, ch, 1), nn.GroupNorm(8, ch), nn.ReLU(inplace=True)]
             last = ch
         self.mlp = nn.Sequential(*layers)
         self.out_ch = mlp_channels[-1]
@@ -134,7 +134,7 @@ class FeaturePropagation(nn.Module):
         layers = []
         last = in_ch
         for ch in mlp_channels:
-            layers += [nn.Conv1d(last, ch, 1), nn.BatchNorm1d(ch), nn.ReLU(inplace=True)]
+            layers += [nn.Conv1d(last, ch, 1), nn.GroupNorm(8, ch), nn.ReLU(inplace=True)]
             last = ch
         self.mlp = nn.Sequential(*layers)
         self.out_ch = mlp_channels[-1]

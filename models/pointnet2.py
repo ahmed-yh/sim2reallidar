@@ -37,7 +37,7 @@ class PointNet2Encoder(nn.Module):
         self.sa2 = SetAbstraction(n_samples=1024, radius=0.6, k=32, in_ch=64, mlp_channels=[64, 64, 128])
         self.sa3 = SetAbstraction(n_samples=256, radius=1.2, k=32, in_ch=128, mlp_channels=[128, 128, 256])
         self.head = nn.Sequential(
-            nn.Linear(256, 512), nn.BatchNorm1d(512), nn.ReLU(inplace=True),
+            nn.Linear(256, 512), nn.GroupNorm(8, 512), nn.ReLU(inplace=True),
             nn.Linear(512, latent_dim),
         )
         self.latent_dim = latent_dim

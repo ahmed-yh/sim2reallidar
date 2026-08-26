@@ -84,6 +84,25 @@ def test_segmentation_decoder_output_matches_input_point_count():
     assert out["class_logits"].shape == (B, N, NUM_CLASSES)
 
 
+def test_multitask_forward_with_batch_size_one():
+    # Regression test: nn.BatchNorm1d/2d requires batch size > 1 in train()
+    # mode (needs >=2 samples to compute a channel statistic) -- crashed
+    # here at batch_size=1 during a real training smoke test, despite being
+    # the exact fallback this project's own train.py suggests when a larger
+    # batch runs out of memory at 32,768 points/sample. Fixed by switching
+    # every norm layer to GroupNorm, which normalizes within each sample
+    # independently. This test is what the unit suite was missing --
+    # test_multitask_forward_shapes below always used batch_size=2, so it
+    # never exercised this path.
+    model = PointNet2MultiTask()
+    model.train()
+    xyz = torch.randn(1, N, 3)
+    out = model(xyz)
+    assert out["latent"].shape == (1, LATENT_DIM)
+    loss = out["recon_points"].pow(2).mean() + out["class_logits"].pow(2).mean()
+    loss.backward()  # must not raise
+
+
 def test_multitask_forward_shapes():
     model = PointNet2MultiTask()
     xyz = _dummy_batch()

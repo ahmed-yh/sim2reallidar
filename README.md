@@ -294,10 +294,26 @@ python3 -m pytest tests/ -v
 # 3. (Jetson) confirm the point-budget benchmark still holds after any code change
 python3 benchmarks/pointnet2_jetson_bench.py
 
-# 4. (Training machine) train -- see models/pointnet2.py + dataset.py +
-#    losses.py for the pieces; a train.py entry point wiring them together
-#    is the next thing to build in this repo.
+# 4. (Training machine) train
+python3 train.py --recordings-dir /path/to/twc_scenario_.../recordings
 ```
+
+`train.py` wires together `dataset.py` + `losses.py` + `models/pointnet2.py` +
+`train_utils.py` (shared train/validate loop + early stopping) into one entry
+point. Only one candidate exists in this repo so far, so there's no `--model`
+flag yet — adding one is a small extension once the CNN/VAE candidates exist
+alongside this one, not a rewrite. Saves `best_encoder.pt` (the only artifact
+that ever deploys), `best_multitask_model.pt` (full model, kept for
+inspection/resuming only), and `train_metrics.json` (class counts/weights
+actually used, held-out validation numbers, and the run's arguments — for
+reproducibility) to `outputs/pointnet2/`.
+
+Verified end-to-end against real data before being called done: a tiny
+(3 train / 2 val samples, 2 epochs) run on this CPU-only dev machine trains
+without crashing, losses move in the right direction, `best_encoder.pt` loads
+cleanly into a fresh `PointNet2Encoder`. That's a **correctness** smoke test,
+not a real training run — actual training needs the Quadro, and this repo
+deliberately never attempts a real run anywhere else.
 
 `data/` is gitignored (134MB+ of derived arrays, regenerable from the raw
 recordings by step 1) — never committed, always regenerated locally.
@@ -379,6 +395,17 @@ for the thesis writeup:
    k), but is now handled explicitly (pad with the nearest-neighbor fallback)
    rather than left to fail by luck. Caught by
    `test_ball_query_handles_fewer_than_k_neighbors_without_crashing`.
+4. **Every norm layer was `BatchNorm`, which requires batch size > 1 in
+   training mode** (it needs at least 2 samples to compute a channel
+   statistic) — crashed during a real training smoke test at `batch_size=1`,
+   despite that being exactly the fallback `train.py`'s own OOM error message
+   suggests when a larger batch doesn't fit in memory at 32,768 points/sample.
+   Not caught by the unit tests, which had all along tested the model at
+   `batch_size=2` — worth noting as a reason end-to-end smoke tests and unit
+   tests catch genuinely different things. Fixed by switching every norm
+   layer to `GroupNorm` (normalizes within each sample independently, no
+   cross-sample statistic needed). Caught by
+   `test_multitask_forward_with_batch_size_one`.
 
 Run with:
 ```bash
@@ -404,12 +431,14 @@ python3 -m pytest tests/ -v
   if any class turns out to need more signal than this recording can give it.
 - **Jetson benchmark numbers predate the `ball_query`/`farthest_point_sample`
   fixes** and should be re-confirmed (see "Point budget" above).
-- **`train.py` (wiring `dataset.py` + `losses.py` + `models/pointnet2.py` into an
-  actual training loop, matching the other two candidates' shared harness) is not
-  yet built** — this repo currently has all the pieces, individually tested and
-  verified end-to-end together (dataset → model → both losses → backward, run
-  against real recordings, not just synthetic data), but not yet a single training
-  entry point.
+- **Real training memory/throughput on the Quadro is not yet measured.**
+  `train.py --batch-size 2` is a conservative default reasoned from the
+  FPS/ball-query distance-matrix sizes at 32,768 points (SA1 alone computes a
+  ~537MB `cdist` per sample), not from an observed number — this repo has
+  never run on a GPU. Expect to need to tune `--batch-size` and possibly
+  `--chamfer-target-subsample` once real usage is visible; the OOM handling
+  in `train.py` gives an actionable error rather than a bare stack trace, but
+  the actual safe batch size is still an open question.
 
 ## Project structure
 
@@ -423,6 +452,8 @@ sim2real-lidar/
 │   └── pointnet2.py           # PointNet2Encoder + both decoders + PointNet2MultiTask wrapper
 ├── dataset.py                  # PointCloudDataset: raw recordings -> decimated (xyz, class) pairs
 ├── losses.py                   # Chamfer distance, class-weighted cross-entropy
+├── train_utils.py              # shared train/validate loop, early stopping
+├── train.py                    # training entry point
 ├── benchmarks/
 │   └── pointnet2_jetson_bench.py  # real Jetson latency/memory measurement
 ├── tests/                      # synthetic-fixture unit tests, no external data needed
