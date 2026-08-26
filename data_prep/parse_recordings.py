@@ -41,7 +41,7 @@ def parse_one(npz_path: Path) -> tuple[np.ndarray, np.ndarray]:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--recordings-dir", type=Path,
-                     default=Path("/home/ahmed/twc_scenario_6633e5c2/recordings"))
+                     default=Path(__file__).resolve().parents[1] / "scenario_data" / "twc_scenario_6633e5c2" / "recordings")
     ap.add_argument("--out-dir", type=Path,
                      default=Path(__file__).resolve().parents[1] / "data" / "sim")
     args = ap.parse_args()

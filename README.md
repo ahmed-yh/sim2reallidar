@@ -246,6 +246,39 @@ no individual training step ever selects an absent class as a target.
 
 ## Setup
 
+### Cloning this repo (any machine)
+
+This is a **code-only** repo — `git clone`/`git pull` gets every `.py` file, the
+tests, and this README, but not the data. Deliberate: the raw scenario recordings
+alone are ~496MB, GitHub's free LFS storage is only ~1GB/repo, and this project
+will likely add more recorded scenarios over time — that adds up fast against a
+free quota. Two things need to exist locally (neither is in git):
+
+**`scenario_data/`** (~496MB: the 600 `.npz`/`.json` recordings, the Gazebo
+world/scenario files, environment meshes, driving-map visualization) — synced by
+whatever channel works between your two machines, not via GitHub. From this dev
+machine to the Quadro, for example:
+
+```bash
+rsync -avzP /home/ahmed/sim2real-lidar/scenario_data/ quadro-host:/path/to/sim2real-lidar/scenario_data/
+```
+
+(swap in the Quadro's real hostname/path — this command hasn't been run, since this
+session has no network path to that machine; adjust and run it yourself, or use
+scp/a shared drive/whatever's easiest.)
+
+**`data/`** (parsed range/class grids + train/val/test split, ~134MB) — don't sync
+this at all, regenerate it locally on each machine instead. It's fully and
+deterministically reproducible from `scenario_data/` (no RNG anywhere in
+`data_prep/parse_recordings.py` or `split.py` — confirmed by regenerating it from
+the in-repo copy and diffing the class-count/split-size output against the original
+run: identical):
+
+```bash
+python3 data_prep/parse_recordings.py   # ~10s
+python3 data_prep/split.py              # instant
+```
+
 ### Training machine (Quadro RTX 5000 or equivalent)
 
 ```bash
@@ -282,9 +315,14 @@ would buy.
 ## Running the pipeline
 
 ```bash
+# 0. scenario_data/ must already be present -- see "Cloning this repo" above,
+#    it does not come from git.
+
 # 1. Parse the raw scenario recordings into (range, class) grids for the CNN/VAE
 #    candidates, and compute the shared spatial-block train/val/test split.
-python3 data_prep/parse_recordings.py --recordings-dir /path/to/twc_scenario_.../recordings
+#    (--recordings-dir defaults to scenario_data/twc_scenario_6633e5c2/recordings;
+#    override it if scenario_data/ holds a differently-named scenario.)
+python3 data_prep/parse_recordings.py
 python3 data_prep/split.py
 
 # 2. Run the test suite (fast, CPU, synthetic data -- no GPU or real scenario
@@ -295,7 +333,7 @@ python3 -m pytest tests/ -v
 python3 benchmarks/pointnet2_jetson_bench.py
 
 # 4. (Training machine) train
-python3 train.py --recordings-dir /path/to/twc_scenario_.../recordings
+python3 train.py
 ```
 
 `train.py` wires together `dataset.py` + `losses.py` + `models/pointnet2.py` +
@@ -456,6 +494,7 @@ sim2real-lidar/
 ├── train.py                    # training entry point
 ├── benchmarks/
 │   └── pointnet2_jetson_bench.py  # real Jetson latency/memory measurement
-├── tests/                      # synthetic-fixture unit tests, no external data needed
-└── data/                        # gitignored -- regenerated locally, never committed
+├── tests/                       # synthetic-fixture unit tests, no external data needed
+├── scenario_data/               # gitignored -- NOT in this repo, sync separately (see "Cloning")
+└── data/                        # gitignored -- regenerated locally from scenario_data/
 ```

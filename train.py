@@ -32,7 +32,7 @@ from train_utils import fit, validate
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--recordings-dir", type=Path,
-                     default=Path("/home/ahmed/twc_scenario_6633e5c2/recordings"))
+                     default=Path(__file__).parent / "scenario_data" / "twc_scenario_6633e5c2" / "recordings")
     ap.add_argument("--splits-dir", type=Path, default=Path(__file__).parent / "data" / "sim")
     ap.add_argument("--outputs-dir", type=Path, default=Path(__file__).parent / "outputs" / "pointnet2")
 

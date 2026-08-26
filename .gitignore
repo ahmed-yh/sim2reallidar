@@ -8,6 +8,11 @@ __pycache__/
 # arrays. See README "Reproducing data/" for the exact commands.
 data/
 
+# Raw scenario recordings (~496MB) -- code-only repo by design (see README
+# "Getting scenario_data/ onto another machine"). Synced separately, not via
+# git -- this much binary data doesn't belong in a GitHub repo's history.
+scenario_data/
+
 # training artifacts
 outputs/
 runs/
