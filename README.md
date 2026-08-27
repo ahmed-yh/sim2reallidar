@@ -394,6 +394,25 @@ Chaining these back down through the same hierarchy in reverse
 (`SegmentationDecoder`) recovers a prediction at every one of the original 32,768
 input points.
 
+## Visualizing the data
+
+`viz/mbut_playback.html` is a self-contained (open it directly in a browser, no
+server needed) frame-by-frame player over all 600 scans — range channel and class
+channel exactly as the model sees them, plus live telemetry (time, position,
+distance traveled) and a class legend that lights up per-frame, making the class
+imbalance from "The data" above directly visible rather than just a number: watch
+it and most frames are pure environment, with object classes flashing in for only
+a few frames at a stretch. Regenerate it after any change to `data/sim/`:
+
+```bash
+python3 viz/gen_playback.py
+```
+
+`viz/player_template.html` is the static player shell (HTML/CSS/JS); `gen_playback.py`
+renders each scan to a small downsampled, palette-compressed PNG (32-color adaptive
+palette — roughly halves the size of truecolor PNG with no visible quality loss at
+this scale) and injects the result into the template.
+
 ## Testing
 
 `tests/` uses a **synthetic** fixture (`tests/conftest.py`), not the real ~400MB
@@ -495,6 +514,10 @@ sim2real-lidar/
 ├── benchmarks/
 │   └── pointnet2_jetson_bench.py  # real Jetson latency/memory measurement
 ├── tests/                       # synthetic-fixture unit tests, no external data needed
+├── viz/
+│   ├── gen_playback.py         # data/sim/ -> mbut_playback.html
+│   ├── player_template.html    # static player shell (HTML/CSS/JS)
+│   └── mbut_playback.html      # generated, self-contained -- open directly in a browser
 ├── scenario_data/               # gitignored -- NOT in this repo, sync separately (see "Cloning")
 └── data/                        # gitignored -- regenerated locally from scenario_data/
 ```

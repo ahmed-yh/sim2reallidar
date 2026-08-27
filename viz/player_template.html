@@ -1,0 +1,467 @@
+<title>MBUT Corridor Playback</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #eef1f3;
+    --surface: #ffffff;
+    --surface-2: #e4e9ec;
+    --border: #cdd5da;
+    --text: #17222b;
+    --text-dim: #5b6b76;
+    --accent: #0f9c8f;
+    --accent-soft: #0f9c8f22;
+    --warm: #c9761f;
+    --danger: #c94f3a;
+    --track: #d3dade;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0a0e12;
+      --surface: #10161c;
+      --surface-2: #171f27;
+      --border: #263039;
+      --text: #e8edf1;
+      --text-dim: #7c8894;
+      --accent: #4fd1c5;
+      --accent-soft: #4fd1c522;
+      --warm: #f2a65a;
+      --danger: #e8705a;
+      --track: #1e2830;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0a0e12;
+    --surface: #10161c;
+    --surface-2: #171f27;
+    --border: #263039;
+    --text: #e8edf1;
+    --text-dim: #7c8894;
+    --accent: #4fd1c5;
+    --accent-soft: #4fd1c522;
+    --warm: #f2a65a;
+    --danger: #e8705a;
+    --track: #1e2830;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    margin: 0;
+    padding: 24px;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+  }
+  .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  .console {
+    width: 100%;
+    max-width: 1100px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: 0.01em;
+  }
+  header .eyebrow {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  header .stats {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+  }
+
+  .main-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 240px;
+    gap: 14px;
+  }
+  @media (max-width: 720px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  .viewport {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .viewport-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .frame-img-wrap {
+    position: relative;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--track);
+    border: 1px solid var(--border);
+  }
+  .frame-img-wrap img {
+    display: block;
+    width: 100%;
+    height: auto;
+    image-rendering: pixelated;
+  }
+  .channel-divider {
+    position: absolute;
+    left: 0; right: 0;
+    top: 33.5%;
+    height: 1px;
+    background: var(--bg);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .channel-tag {
+    position: absolute;
+    left: 8px;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.75);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    pointer-events: none;
+  }
+  .channel-tag.range { top: 6px; }
+  .channel-tag.class { top: 37%; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .panel h2 {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin: 0 0 8px 0;
+  }
+  .telemetry-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.82rem;
+  }
+  .telemetry-row:last-child { border-bottom: none; }
+  .telemetry-row .k { color: var(--text-dim); }
+  .telemetry-row .v { font-weight: 500; }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 0.8rem;
+    transition: opacity 0.15s ease;
+  }
+  .legend-item.inactive { opacity: 0.32; }
+  .legend-swatch {
+    width: 11px; height: 11px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .legend-name { flex: 1; }
+  .legend-count {
+    color: var(--text-dim);
+    font-size: 0.74rem;
+  }
+  .legend-item.inactive .legend-count { visibility: hidden; }
+
+  .transport {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .transport button {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 7px;
+    width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s ease, border-color 0.12s ease;
+  }
+  .transport button:hover { border-color: var(--accent); }
+  .transport button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .transport button svg { width: 14px; height: 14px; fill: var(--text); }
+  #playBtn {
+    width: 40px; height: 40px;
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+  #playBtn svg { fill: var(--accent); width: 15px; height: 15px; }
+
+  .scrub-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--track);
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--surface);
+    box-shadow: 0 0 0 1px var(--accent);
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 13px; height: 13px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--surface);
+    cursor: pointer;
+  }
+  input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  .scrub-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+  }
+
+  select {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  footer {
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    padding-top: 4px;
+  }
+  footer a { color: var(--accent); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+
+<div class="console">
+  <header>
+    <div>
+      <span class="eyebrow">LiDAR playback &middot; scenario 6633e5c2</span>
+      <h1>MBUT corridor &mdash; what the encoder sees</h1>
+    </div>
+    <div class="stats mono">600 scans &middot; ~318s &middot; ~121m corridor</div>
+  </header>
+
+  <div class="main-grid">
+    <div class="viewport">
+      <div class="viewport-labels">
+        <span>Range &amp; class channels, as fed to the model</span>
+        <span class="mono" id="frameCounter">001 / 600</span>
+      </div>
+      <div class="frame-img-wrap">
+        <img id="frameImg" src="" alt="LiDAR range and class scan" />
+        <span class="channel-tag range">range</span>
+        <span class="channel-tag class">class</span>
+        <div class="channel-divider"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div>
+        <h2>Telemetry</h2>
+        <div class="telemetry-row"><span class="k">Time</span><span class="v mono" id="tTime">0.0s</span></div>
+        <div class="telemetry-row"><span class="k">Position</span><span class="v mono" id="tPos">0.0, 0.0</span></div>
+        <div class="telemetry-row"><span class="k">Distance</span><span class="v mono" id="tDist">0.0m</span></div>
+      </div>
+      <div>
+        <h2>Classes in this frame</h2>
+        <div id="legend"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="transport">
+    <button id="playBtn" aria-label="Play/pause" title="Play/pause (space)">
+      <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+    </button>
+    <button id="prevBtn" aria-label="Previous frame" title="Previous frame">
+      <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+    </button>
+    <button id="nextBtn" aria-label="Next frame" title="Next frame">
+      <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 6l8.5 6L6 18z"/></svg>
+    </button>
+    <div class="scrub-wrap">
+      <input type="range" id="scrub" min="0" max="599" value="0" />
+      <div class="scrub-labels"><span id="scrubT0" class="mono">0:00</span><span id="scrubT1" class="mono">5:18</span></div>
+    </div>
+    <select id="speedSel" aria-label="Playback speed" title="Playback speed">
+      <option value="200">0.5&times;</option>
+      <option value="100" selected>1&times;</option>
+      <option value="50">2&times;</option>
+      <option value="25">4&times;</option>
+    </select>
+  </div>
+
+  <footer>Scenario 6633e5c2 &middot; sim2real-lidar &middot; class colors: env dark, sphere amber, cylinder teal, box2 yellow, box1 coral</footer>
+</div>
+
+<script id="frame-data" type="application/json">__FRAMES_JSON__</script>
+<script>
+(function () {
+  const data = JSON.parse(document.getElementById('frame-data').textContent);
+  const frames = data.frames;
+  const meta = data.meta;
+  const N = frames.length;
+
+  const CLASS_INFO = {
+    4: { name: 'Sphere', color: '#f2a65a' },
+    5: { name: 'Cylinder', color: '#4fd1c5' },
+    6: { name: 'Box2', color: '#f0d65a' },
+    7: { name: 'Box1', color: '#eb6e5a' },
+  };
+
+  const img = document.getElementById('frameImg');
+  const counter = document.getElementById('frameCounter');
+  const scrub = document.getElementById('scrub');
+  const tTime = document.getElementById('tTime');
+  const tPos = document.getElementById('tPos');
+  const tDist = document.getElementById('tDist');
+  const legend = document.getElementById('legend');
+  const playBtn = document.getElementById('playBtn');
+  const playIcon = document.getElementById('playIcon');
+  const pauseIcon = document.getElementById('pauseIcon');
+  const speedSel = document.getElementById('speedSel');
+
+  scrub.max = N - 1;
+  document.getElementById('scrubT1').textContent = formatTime(meta[N - 1].t);
+
+  for (const cls in CLASS_INFO) {
+    const info = CLASS_INFO[cls];
+    const row = document.createElement('div');
+    row.className = 'legend-item';
+    row.id = 'legend-' + cls;
+    row.innerHTML = `<span class="legend-swatch" style="background:${info.color}"></span>
+      <span class="legend-name">${info.name}</span>
+      <span class="legend-count mono" id="legend-count-${cls}"></span>`;
+    legend.appendChild(row);
+  }
+
+  function formatTime(s) {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return m + ':' + String(sec).padStart(2, '0');
+  }
+
+  let current = 0;
+  let playing = true;
+  let timer = null;
+
+  function render(i) {
+    current = i;
+    img.src = 'data:image/png;base64,' + frames[i];
+    counter.textContent = String(i + 1).padStart(3, '0') + ' / ' + N;
+    scrub.value = i;
+    const m = meta[i];
+    tTime.textContent = formatTime(m.t);
+    tPos.textContent = m.x.toFixed(1) + ', ' + m.y.toFixed(1);
+    tDist.textContent = m.dist.toFixed(1) + 'm';
+
+    for (const cls in CLASS_INFO) {
+      const count = m.class_counts[cls] || 0;
+      const row = document.getElementById('legend-' + cls);
+      row.classList.toggle('inactive', count === 0);
+      document.getElementById('legend-count-' + cls).textContent = count > 0 ? count + ' pts' : '';
+    }
+  }
+
+  function step() {
+    render((current + 1) % N);
+  }
+
+  function play() {
+    playing = true;
+    playIcon.style.display = 'none';
+    pauseIcon.style.display = '';
+    timer = setInterval(step, parseInt(speedSel.value, 10));
+  }
+  function pause() {
+    playing = false;
+    playIcon.style.display = '';
+    pauseIcon.style.display = 'none';
+    clearInterval(timer);
+  }
+
+  playBtn.addEventListener('click', () => playing ? pause() : play());
+  document.getElementById('prevBtn').addEventListener('click', () => { pause(); render((current - 1 + N) % N); });
+  document.getElementById('nextBtn').addEventListener('click', () => { pause(); render((current + 1) % N); });
+  scrub.addEventListener('input', () => { pause(); render(parseInt(scrub.value, 10)); });
+  speedSel.addEventListener('change', () => { if (playing) { pause(); play(); } });
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') { e.preventDefault(); playing ? pause() : play(); }
+    if (e.code === 'ArrowLeft') { pause(); render((current - 1 + N) % N); }
+    if (e.code === 'ArrowRight') { pause(); render((current + 1) % N); }
+  });
+
+  render(0);
+  play();
+})();
+</script>
