@@ -37,6 +37,17 @@ N_POINTS = (N_RINGS // RING_STRIDE) * (N_COLS // COL_STRIDE)  # 32,768
 NUM_CLASSES = 8  # raw indices 0-7
 
 
+def resolve_recording_path(recordings_dir: Path, sample_id: str) -> Path:
+    """sample_id is either a bare timestamp (single-scenario layout) or
+    "{scenario_id}__{timestamp}" (multi-scenario layout, see
+    data_prep/parse_recordings.py's module docstring) -- the latter lives
+    one directory level deeper, under its own scenario_id subdirectory."""
+    if "__" in sample_id:
+        scenario_id, timestamp = sample_id.split("__", 1)
+        return recordings_dir / scenario_id / f"{timestamp}.npz"
+    return recordings_dir / f"{sample_id}.npz"
+
+
 def _load_raw(npz_path: Path) -> tuple[np.ndarray, np.ndarray]:
     """One recording -> decimated (xyz, class) point arrays, no-return
     points dropped, padded back to exactly N_POINTS by resampling existing
@@ -83,7 +94,7 @@ class PointCloudDataset(Dataset):
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         sample_id = self.sample_ids[idx]
-        npz_path = self.recordings_dir / f"{sample_id}.npz"
+        npz_path = resolve_recording_path(self.recordings_dir, sample_id)
         xyz, cls = _load_raw(npz_path)
         return torch.from_numpy(xyz), torch.from_numpy(cls)
 
@@ -98,7 +109,7 @@ def compute_class_counts(recordings_dir: str | Path, sample_ids: Sequence[str]) 
     recordings_dir = Path(recordings_dir)
     counts: dict[int, int] = {}
     for sample_id in sample_ids:
-        _, cls = _load_raw(recordings_dir / f"{sample_id}.npz")
+        _, cls = _load_raw(resolve_recording_path(recordings_dir, sample_id))
         u, c = np.unique(cls, return_counts=True)
         for uu, cc in zip(u.tolist(), c.tolist()):
             counts[uu] = counts.get(uu, 0) + cc

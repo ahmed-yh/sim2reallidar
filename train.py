@@ -32,7 +32,7 @@ from train_utils import fit, validate
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--recordings-dir", type=Path,
-                     default=Path(__file__).parent / "scenario_data" / "twc_scenario_6633e5c2" / "recordings")
+                     default=Path(__file__).parent / "scenario_data" / "mbut_76scenarios" / "o_robot_nav")
     ap.add_argument("--splits-dir", type=Path, default=Path(__file__).parent / "data" / "sim")
     ap.add_argument("--outputs-dir", type=Path, default=Path(__file__).parent / "outputs" / "pointnet2")
 
@@ -54,6 +54,13 @@ def main():
     ap.add_argument("--weight-cap", type=float, default=100.0,
                      help="Cap on class weights (both for the rarest present class and for "
                           "absent classes, which would otherwise be inf -- see losses.py).")
+    ap.add_argument("--init-from", type=Path, default=None,
+                     help="Warm-start model weights from a previous best_multitask_model.pt "
+                          "instead of random init. NOT a true resume: the optimizer state "
+                          "(Adam's momentum/variance) is not saved anywhere by this script, so "
+                          "it restarts fresh here, and epoch numbering / early-stopping restart "
+                          "from 1 too. Practically fine for continuing to improve a checkpoint, "
+                          "just not byte-identical to an uninterrupted run.")
     args = ap.parse_args()
 
     args.outputs_dir.mkdir(parents=True, exist_ok=True)
@@ -83,12 +90,24 @@ def main():
     )
 
     model = PointNet2MultiTask(latent_dim=LATENT_DIM, num_classes=NUM_CLASSES).to(device)
+    if args.init_from is not None:
+        model.load_state_dict(torch.load(args.init_from, map_location=device))
+        print(f"Warm-started weights from {args.init_from} (fresh optimizer, epoch count restarts at 1)")
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     class_weights = class_weights.to(device)
 
     def log(epoch, train_recon, train_class, val_recon, val_class):
         print(f"epoch {epoch:3d} | train recon {train_recon:.5f} class {train_class:.5f} "
               f"| val recon {val_recon:.5f} class {val_class:.5f}")
+
+    def save_checkpoint(epoch, model):
+        # Fires on every new best -- see fit()'s docstring for why this
+        # can't just wait until the end. Same two files main() writes on
+        # completion; a run that crashes after this point still has its
+        # best-so-far on disk, not just in a process's RAM.
+        torch.save(model.encoder.state_dict(), args.outputs_dir / "best_encoder.pt")
+        torch.save(model.state_dict(), args.outputs_dir / "best_multitask_model.pt")
+        print(f"  (epoch {epoch}: new best, checkpoint saved to {args.outputs_dir})", flush=True)
 
     print(f"\nStarting training: {N_POINTS} points/sample, batch_size={args.batch_size}, "
           f"lambda_class={args.lambda_class}")
@@ -98,6 +117,7 @@ def main():
             class_weights=class_weights, lambda_class=args.lambda_class,
             chamfer_target_subsample=args.chamfer_target_subsample, device=device,
             max_epochs=args.max_epochs, patience=args.patience, log_fn=log,
+            on_new_best=save_checkpoint,
         )
     except torch.cuda.OutOfMemoryError:
         raise SystemExit(
