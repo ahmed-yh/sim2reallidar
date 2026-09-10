@@ -59,7 +59,7 @@
 
   .console {
     width: 100%;
-    max-width: 1100px;
+    max-width: 1500px;
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -354,10 +354,11 @@
       <div class="scrub-labels"><span id="scrubT0" class="mono">0:00</span><span id="scrubT1" class="mono">5:18</span></div>
     </div>
     <select id="speedSel" aria-label="Playback speed" title="Playback speed">
-      <option value="200">0.5&times;</option>
-      <option value="100" selected>1&times;</option>
-      <option value="50">2&times;</option>
-      <option value="25">4&times;</option>
+      <option value="0.5">0.5&times;</option>
+      <option value="1" selected>1&times; (real time)</option>
+      <option value="2">2&times;</option>
+      <option value="4">4&times;</option>
+      <option value="10">10&times;</option>
     </select>
   </div>
 
@@ -414,6 +415,10 @@
   let current = 0;
   let playing = true;
   let timer = null;
+  // Average real seconds between frames -- used as the wraparound delay
+  // (looping back to frame 0 has no "real" gap to measure) and as a
+  // sane fallback if a recording's timestamps are ever irregular.
+  const avgDt = N > 1 ? meta[N - 1].t / (N - 1) : 1;
 
   function render(i) {
     current = i;
@@ -433,21 +438,34 @@
     }
   }
 
-  function step() {
-    render((current + 1) % N);
+  function scheduleNext() {
+    const next = (current + 1) % N;
+    // Real elapsed time to the NEXT frame, not a fixed step -- a fixed
+    // per-frame interval (the previous implementation) plays back at
+    // whatever rate happens to fall out of frame count vs. that constant,
+    // which is only "1x" by coincidence for one particular frame count.
+    // Wraparound (last frame -> first) has no real gap to measure, so it
+    // falls back to the recording's own average frame spacing.
+    const realDt = next === 0 ? avgDt : (meta[next].t - meta[current].t);
+    const speed = parseFloat(speedSel.value);
+    const delayMs = Math.max(16, (realDt / speed) * 1000);
+    timer = setTimeout(() => {
+      render(next);
+      if (playing) scheduleNext();
+    }, delayMs);
   }
 
   function play() {
     playing = true;
     playIcon.style.display = 'none';
     pauseIcon.style.display = '';
-    timer = setInterval(step, parseInt(speedSel.value, 10));
+    scheduleNext();
   }
   function pause() {
     playing = false;
     playIcon.style.display = '';
     pauseIcon.style.display = 'none';
-    clearInterval(timer);
+    clearTimeout(timer);
   }
 
   playBtn.addEventListener('click', () => playing ? pause() : play());

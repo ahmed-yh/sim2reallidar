@@ -4,6 +4,13 @@ Written fresh for this repo, not copied from the existing CNN baseline
 elsewhere in this project (per earlier project decision: that codebase is
 not used as a design reference here) -- same standard early-stopping idea,
 independent implementation.
+
+Generalized to a pluggable `loss_fn` (see LossFn below) once a second
+candidate (SalsaNext, grid-based) needed a genuinely different loss --
+masked MSE + masked cross-entropy on a (B,C,H,W) grid, not Chamfer distance
+on a point set -- rather than duplicate this loop a second time. PointNet++'s
+own loss (train.py) is unaffected: it's now passed in as a loss_fn built
+from losses.compute_losses via functools.partial, same computation as before.
 """
 from __future__ import annotations
 
@@ -16,7 +23,11 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from losses import chamfer_distance, segmentation_loss
+# (model, batch, class_weights, lambda_class) -> (total_loss, recon_loss, class_loss).
+# `batch` is whatever tuple of tensors the DataLoader yields, already moved to
+# device -- the loop itself no longer knows or cares what's inside it.
+LossFn = Callable[[nn.Module, tuple, torch.Tensor, float],
+                   tuple[torch.Tensor, torch.Tensor, torch.Tensor]]
 
 
 def _progress_line(phase: str, i: int, total: int, t0: float,
@@ -40,38 +51,20 @@ def _progress_line(phase: str, i: int, total: int, t0: float,
             f"elapsed {elapsed/60:5.1f}m  eta {eta/60:5.1f}m")
 
 
-def compute_losses(model: nn.Module, xyz: torch.Tensor, cls: torch.Tensor,
-                    class_weights: torch.Tensor, lambda_class: float,
-                    chamfer_target_subsample: int | None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """One forward pass -> (total_loss, recon_loss, class_loss), the latter
-    two kept separate so training curves can be watched independently (a
-    class loss that stalls while recon keeps improving, or vice versa, is a
-    real diagnostic signal, not something to bury in a single combined
-    number)."""
-    out = model(xyz)
-    recon_loss = chamfer_distance(out["recon_points"], xyz, target_subsample=chamfer_target_subsample)
-    class_loss = segmentation_loss(out["class_logits"], cls, class_weights)
-    total = recon_loss + lambda_class * class_loss
-    return total, recon_loss, class_loss
-
-
 def train_one_epoch(model: nn.Module, loader: DataLoader, optimizer: torch.optim.Optimizer,
-                     class_weights: torch.Tensor, lambda_class: float,
-                     chamfer_target_subsample: int | None, device: torch.device,
-                     log_every: int = 10) -> tuple[float, float]:
+                     class_weights: torch.Tensor, lambda_class: float, device: torch.device,
+                     loss_fn: LossFn, log_every: int = 10) -> tuple[float, float]:
     model.train()
     recon_total, class_total, n = 0.0, 0.0, 0
     n_batches = len(loader)
     t0 = time.time()
-    for i, (xyz, cls) in enumerate(loader, 1):
-        xyz, cls = xyz.to(device, non_blocking=True), cls.to(device, non_blocking=True)
+    for i, batch in enumerate(loader, 1):
+        batch = tuple(t.to(device, non_blocking=True) for t in batch)
         optimizer.zero_grad(set_to_none=True)
-        total, recon_loss, class_loss = compute_losses(
-            model, xyz, cls, class_weights, lambda_class, chamfer_target_subsample
-        )
+        total, recon_loss, class_loss = loss_fn(model, batch, class_weights, lambda_class)
         total.backward()
         optimizer.step()
-        bs = xyz.size(0)
+        bs = batch[0].size(0)
         recon_total += recon_loss.item() * bs
         class_total += class_loss.item() * bs
         n += bs
@@ -83,18 +76,16 @@ def train_one_epoch(model: nn.Module, loader: DataLoader, optimizer: torch.optim
 
 @torch.no_grad()
 def validate(model: nn.Module, loader: DataLoader, class_weights: torch.Tensor,
-             lambda_class: float, chamfer_target_subsample: int | None,
-             device: torch.device, log_every: int = 5) -> tuple[float, float]:
+             lambda_class: float, device: torch.device,
+             loss_fn: LossFn, log_every: int = 5) -> tuple[float, float]:
     model.eval()
     recon_total, class_total, n = 0.0, 0.0, 0
     n_batches = len(loader)
     t0 = time.time()
-    for i, (xyz, cls) in enumerate(loader, 1):
-        xyz, cls = xyz.to(device, non_blocking=True), cls.to(device, non_blocking=True)
-        _, recon_loss, class_loss = compute_losses(
-            model, xyz, cls, class_weights, lambda_class, chamfer_target_subsample
-        )
-        bs = xyz.size(0)
+    for i, batch in enumerate(loader, 1):
+        batch = tuple(t.to(device, non_blocking=True) for t in batch)
+        _, recon_loss, class_loss = loss_fn(model, batch, class_weights, lambda_class)
+        bs = batch[0].size(0)
         recon_total += recon_loss.item() * bs
         class_total += class_loss.item() * bs
         n += bs
@@ -130,8 +121,8 @@ class EarlyStopping:
 
 def fit(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader,
         optimizer: torch.optim.Optimizer, class_weights: torch.Tensor, lambda_class: float,
-        chamfer_target_subsample: int | None, device: torch.device, max_epochs: int,
-        patience: int, log_fn: Callable[[int, float, float, float, float], None] | None = None,
+        device: torch.device, max_epochs: int, patience: int, loss_fn: LossFn,
+        log_fn: Callable[[int, float, float, float, float], None] | None = None,
         on_new_best: Callable[[int, nn.Module], None] | None = None
         ) -> EarlyStopping:
     """on_new_best, if given, fires the moment a new best checkpoint is found
@@ -143,10 +134,10 @@ def fit(model: nn.Module, train_loader: DataLoader, val_loader: DataLoader,
     es = EarlyStopping(patience=patience)
     for epoch in range(1, max_epochs + 1):
         train_recon, train_class = train_one_epoch(
-            model, train_loader, optimizer, class_weights, lambda_class, chamfer_target_subsample, device
+            model, train_loader, optimizer, class_weights, lambda_class, device, loss_fn
         )
         val_recon, val_class = validate(
-            model, val_loader, class_weights, lambda_class, chamfer_target_subsample, device
+            model, val_loader, class_weights, lambda_class, device, loss_fn
         )
         val_total = val_recon + lambda_class * val_class
         if log_fn is not None:

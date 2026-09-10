@@ -13,6 +13,11 @@ data/
 # git -- this much binary data doesn't belong in a GitHub repo's history.
 scenario_data/
 
+# Real ROS2 bags transferred from the Ouster OS1 robot for sim2real
+# evaluation -- tens of GB, same reasoning as scenario_data/ above. Synced
+# separately (scp), not via git.
+real_bags/
+
 # training artifacts
 outputs/
 runs/
