@@ -1,0 +1,10 @@
+# Generated, self-contained playback pages -- almost entirely base64-encoded
+# image data inline in <script> tags, not hand-written markup. Without this,
+# GitHub's language detector counts their raw bytes as "HTML" and swamps the
+# actual Python source in the language stats (these 3 files: ~25.5MB vs
+# ~213KB of .py, a ~120x ratio that has nothing to do with where the actual
+# project work is). linguist-generated excludes them from language stats and
+# collapses their diffs by default; the files themselves are untouched.
+viz/mbut_playback.html linguist-generated
+viz/kevin_playback.html linguist-generated
+viz/pointnet2_playback.html linguist-generated
