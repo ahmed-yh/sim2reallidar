@@ -30,18 +30,40 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "viz"))
 
-from playback_common import class_rgb, label_row, orient, range_rgb  # noqa: E402
+from playback_common import class_rgb, label_row, range_rgb  # noqa: E402
+
+# NOT orient()-ed like the simulated-data playbacks (viz/): that flip was
+# verified against the SIMULATED sensor's ring order ("ring 0 = lowest,
+# ground-facing beam"), which is a property of the simulation's LiDAR
+# plugin, not a law of physics. Checked directly against this project's own
+# real Ouster OS1-64 bags (mean elevation angle per ring, see project notes,
+# 2026-09-14): ring 0 is the HIGHEST beam (~+21 deg) and ring 63 the LOWEST
+# (~-17 deg) -- the OPPOSITE of the simulated convention. A raw (ring, col)
+# grid rendered row-0-at-top is therefore ALREADY correct for real data;
+# applying the simulated flip on top of it was upside down.
 
 EXPECTED_RINGS = 64
 EXPECTED_COLS = 1024
 
 
 class ModelRunner:
-    def __init__(self, model_name: str, checkpoint_path: Path, max_range: float):
+    def __init__(self, model_name: str, checkpoint_path: Path, max_range: float,
+                 class_conf_threshold: float = 0.7):
+        """class_conf_threshold: the classifier's argmax always picks SOME
+        class, even when its softmax confidence is barely above chance --
+        on real (domain-shifted) data this shows up as speckled false
+        positives across the ~99% of points that are legitimately
+        environment, since even a small per-point error rate is a lot of
+        pixels at 64x1024. Below this threshold, a point/pixel displays as
+        environment instead of its low-confidence argmax class. Purely a
+        DISPLAY decision -- does not change the model or its weights. Set
+        to 0 to see the raw, unthresholded argmax (what the model would
+        literally act on downstream)."""
         if model_name not in ("pointnet2", "salsanext", "kevin_cnn"):
             raise ValueError(f"unknown model {model_name!r} (expected pointnet2 | salsanext | kevin_cnn)")
         self.model_name = model_name
         self.max_range = max_range
+        self.class_conf_threshold = class_conf_threshold
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model = self._load_model(model_name, checkpoint_path)
 
@@ -120,7 +142,11 @@ class ModelRunner:
         # per native cell -- scatter back to the columns actually classified
         # via the SAME `finite` mask xyz_in was built from, leaving the odd
         # (never-classified) columns dark rather than fabricating a value.
-        pred_cls_dec = out["class_logits"][0].argmax(dim=-1).cpu().numpy()
+        probs = torch.softmax(out["class_logits"][0], dim=-1)
+        conf, pred_cls_dec = probs.max(dim=-1)
+        pred_cls_dec = torch.where(conf >= self.class_conf_threshold, pred_cls_dec,
+                                    torch.zeros_like(pred_cls_dec))
+        pred_cls_dec = pred_cls_dec.cpu().numpy()
         pred_grid_dec = np.zeros((EXPECTED_RINGS, EXPECTED_COLS // 2), dtype=np.uint8)
         pred_grid_dec.reshape(-1)[finite] = pred_cls_dec
         pred_grid = np.repeat(pred_grid_dec, 2, axis=1)
@@ -131,9 +157,9 @@ class ModelRunner:
 
         gap = np.full((3, EXPECTED_COLS, 3), 10, dtype=np.uint8)
         combined = np.concatenate([
-            label_row(range_rgb(orient(range_native)), "ORIGINAL RANGE (real, measured)"), gap,
-            label_row(range_rgb(orient(recon_range_grid)), "RECONSTRUCTED RANGE"), gap,
-            label_row(class_rgb(orient(pred_grid)), "PREDICTED CLASS (no ground truth on real data)"),
+            label_row(range_rgb(range_native), "ORIGINAL RANGE (real, measured)"), gap,
+            label_row(range_rgb(recon_range_grid), "RECONSTRUCTED RANGE"), gap,
+            label_row(class_rgb(pred_grid), "PREDICTED CLASS (no ground truth on real data)"),
         ], axis=0)
         return combined, mse
 
@@ -148,7 +174,10 @@ class ModelRunner:
         x = torch.from_numpy(inp).unsqueeze(0).to(self.device)
         out = self.model(x)
         recon_n = out["recon_range"][0].cpu().numpy()
-        pred_cls = out["class_logits"][0].argmax(dim=0).cpu().numpy()
+        probs = torch.softmax(out["class_logits"][0], dim=0)
+        conf, pred_cls = probs.max(dim=0)
+        pred_cls = torch.where(conf >= self.class_conf_threshold, pred_cls, torch.zeros_like(pred_cls))
+        pred_cls = pred_cls.cpu().numpy()
 
         orig_display = np.where(valid, range_, np.nan)
         recon_display = np.where(valid, recon_n * self.max_range, np.nan)
@@ -156,9 +185,9 @@ class ModelRunner:
 
         gap = np.full((3, EXPECTED_COLS, 3), 10, dtype=np.uint8)
         combined = np.concatenate([
-            label_row(range_rgb(orient(orig_display)), "ORIGINAL RANGE (real, measured)"), gap,
-            label_row(range_rgb(orient(recon_display)), "RECONSTRUCTED RANGE"), gap,
-            label_row(class_rgb(orient(pred_cls)), "PREDICTED CLASS (no ground truth on real data)"),
+            label_row(range_rgb(orig_display), "ORIGINAL RANGE (real, measured)"), gap,
+            label_row(range_rgb(recon_display), "RECONSTRUCTED RANGE"), gap,
+            label_row(class_rgb(pred_cls), "PREDICTED CLASS (no ground truth on real data)"),
         ], axis=0)
         return combined, mse
 
@@ -176,7 +205,7 @@ class ModelRunner:
 
         gap = np.full((3, EXPECTED_COLS, 3), 10, dtype=np.uint8)
         combined = np.concatenate([
-            label_row(range_rgb(orient(orig_display)), "ORIGINAL RANGE (real, measured)"), gap,
-            label_row(range_rgb(orient(recon_display)), "RECONSTRUCTED RANGE"),
+            label_row(range_rgb(orig_display), "ORIGINAL RANGE (real, measured)"), gap,
+            label_row(range_rgb(recon_display), "RECONSTRUCTED RANGE"),
         ], axis=0)
         return combined, mse

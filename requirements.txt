@@ -9,3 +9,4 @@ torch>=2.0
 numpy>=1.24
 pandas>=2.0
 pytest>=7.0
+opencv-python-headless>=4.8  # ros2_inference/run_inference_on_bag.py --out-video mp4 writing

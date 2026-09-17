@@ -37,7 +37,7 @@ sys.path.insert(0, str(REPO_ROOT / "viz"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _shared_inference import EXPECTED_COLS, EXPECTED_RINGS, ModelRunner  # noqa: E402
-from playback_common import encode_frame, patch_template  # noqa: E402
+from playback_common import encode_frame, label_row, patch_template  # noqa: E402
 
 
 def iter_pointcloud2(bag_path: Path, topic: str):
@@ -82,12 +82,23 @@ def main():
     ap.add_argument("--model", choices=["pointnet2", "salsanext", "kevin_cnn"], default="salsanext")
     ap.add_argument("--checkpoint", type=Path, required=True)
     ap.add_argument("--max-range", type=float, default=14.425)
+    ap.add_argument("--class-threshold", type=float, default=0.7,
+                     help="Confidence threshold for the predicted-class display (see "
+                          "_shared_inference.ModelRunner). Pass 0 to see the raw, unthresholded "
+                          "argmax instead.")
     ap.add_argument("--out", type=Path, default=Path(__file__).parent / "bag_playback.html")
     ap.add_argument("--max-frames", type=int, default=200,
-                     help="Evenly subsample if the bag has more scans than this (Artifact/HTML size cap).")
+                     help="Evenly subsample if the bag has more scans than this (Artifact/HTML size cap). "
+                          "Ignored when --out-video is given -- a video file has no such cap, so every "
+                          "scan in the bag is used, at the bag's own native scan rate.")
+    ap.add_argument("--out-video", type=Path, default=None,
+                     help="Write an actual .mp4 instead of the HTML page -- every scan, played back at "
+                          "the bag's real scan rate, so you can watch inference run live instead of "
+                          "scrubbing static frames. Needs opencv-python-headless (pip install).")
     args = ap.parse_args()
 
-    runner = ModelRunner(args.model, args.checkpoint, args.max_range)
+    runner = ModelRunner(args.model, args.checkpoint, args.max_range,
+                          class_conf_threshold=args.class_threshold)
     print(f"Loaded {args.model} from {args.checkpoint} on {runner.device}")
 
     print(f"Reading {args.topic} from {args.bag} ...")
@@ -96,12 +107,47 @@ def main():
     if len(all_frames) == 0:
         raise SystemExit("no scans found -- check --topic against the bag's actual topics")
 
-    if len(all_frames) > args.max_frames:
+    if args.out_video is None and len(all_frames) > args.max_frames:
         idx = np.linspace(0, len(all_frames) - 1, args.max_frames).round().astype(int)
         all_frames = [all_frames[i] for i in sorted(set(idx.tolist()))]
         print(f"Subsampled to {len(all_frames)} scans")
 
     t0 = all_frames[0][0]
+
+    if args.out_video is not None:
+        import cv2
+        total_s = (all_frames[-1][0] - t0) / 1e9
+        fps = (len(all_frames) - 1) / total_s if total_s > 0 else 10.0
+        print(f"Writing video at {fps:.2f} fps (bag's own scan rate: "
+              f"{len(all_frames)} scans over {total_s:.1f}s)")
+
+        writer = None
+        mses = []
+        n_shape_mismatch = 0
+        for i, (t_ns, height, width, xyz) in enumerate(all_frames):
+            if height != EXPECTED_RINGS or width != EXPECTED_COLS:
+                n_shape_mismatch += 1
+                continue
+            combined, mse = runner.run(xyz)
+            mses.append(mse)
+            bar = label_row(np.full((18, combined.shape[1], 3), 14, dtype=np.uint8),
+                             f"t={(t_ns - t0) / 1e9:6.1f}s  frame {i + 1}/{len(all_frames)}  recon mse {mse:.4f}")
+            frame = np.concatenate([bar, combined], axis=0)
+            if writer is None:
+                h, w = frame.shape[:2]
+                writer = cv2.VideoWriter(str(args.out_video), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+            writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+            if (i + 1) % 50 == 0:
+                print(f"  processed {i + 1}/{len(all_frames)}")
+        writer.release()
+
+        if n_shape_mismatch:
+            print(f"WARNING: skipped {n_shape_mismatch} scans with shape != "
+                  f"({EXPECTED_RINGS},{EXPECTED_COLS}).")
+        print(f"mean recon mse (normalized): {np.mean(mses):.4f}")
+        print(f"wrote {args.out_video} ({len(mses)} frames @ {fps:.2f}fps)")
+        return
+
     frames_b64, meta = [], []
     n_shape_mismatch = 0
     for i, (t_ns, height, width, xyz) in enumerate(all_frames):

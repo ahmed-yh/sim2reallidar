@@ -61,6 +61,12 @@ def main():
                           "it restarts fresh here, and epoch numbering / early-stopping restart "
                           "from 1 too. Practically fine for continuing to improve a checkpoint, "
                           "just not byte-identical to an uninterrupted run.")
+    ap.add_argument("--augment-noise", action="store_true",
+                     help="Inject synthetic real-sensor noise (real_noise_augment.py) into "
+                          "TRAINING samples only -- domain randomization to close part of the "
+                          "sim2real gap (real Ouster bags show false-positive classifications "
+                          "the clean simulated data never trained against). Val stays clean, "
+                          "so val loss still honestly measures learning, not noise-model luck.")
     args = ap.parse_args()
 
     args.outputs_dir.mkdir(parents=True, exist_ok=True)
@@ -78,8 +84,11 @@ def main():
     print(f"  done in {time.time() - t0:.1f}s -- counts: {class_counts}")
     print(f"  weights: {class_weights.tolist()}")
 
+    if args.augment_noise:
+        print("Synthetic real-sensor noise augmentation ENABLED for training samples "
+              "(see real_noise_augment.py)")
     train_loader = DataLoader(
-        PointCloudDataset(args.recordings_dir, train_ids),
+        PointCloudDataset(args.recordings_dir, train_ids, augment=args.augment_noise),
         batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers,
         pin_memory=(device.type == "cuda"),
     )

@@ -48,10 +48,15 @@ def resolve_recording_path(recordings_dir: Path, sample_id: str) -> Path:
     return recordings_dir / f"{sample_id}.npz"
 
 
-def _load_raw(npz_path: Path) -> tuple[np.ndarray, np.ndarray]:
+def _load_raw(npz_path: Path, augment_rng: np.random.Generator | None = None) -> tuple[np.ndarray, np.ndarray]:
     """One recording -> decimated (xyz, class) point arrays, no-return
     points dropped, padded back to exactly N_POINTS by resampling existing
-    valid points (keeps every sample's tensor shape identical for batching)."""
+    valid points (keeps every sample's tensor shape identical for batching).
+
+    augment_rng: if given, injects synthetic real-sensor noise (see
+    real_noise_augment.py) into the raw grid before decimation -- pass this
+    only for TRAINING samples (never val/test), to close part of the
+    sim2real gap without needing any real labeled data."""
     d = np.load(npz_path)
     x, y, z, intensity = d["x"], d["y"], d["z"], d["intensity"]
     if x.size != N_RINGS * N_COLS:
@@ -59,6 +64,10 @@ def _load_raw(npz_path: Path) -> tuple[np.ndarray, np.ndarray]:
 
     xyz = np.stack([x, y, z], axis=-1).reshape(N_RINGS, N_COLS, 3)
     cls = np.rint(intensity).astype(np.int64).reshape(N_RINGS, N_COLS)
+
+    if augment_rng is not None:
+        from real_noise_augment import inject_real_sensor_noise
+        xyz = inject_real_sensor_noise(xyz, augment_rng, cls_grid=cls)
 
     xyz = xyz[::RING_STRIDE, ::COL_STRIDE].reshape(-1, 3)
     cls = cls[::RING_STRIDE, ::COL_STRIDE].reshape(-1)
@@ -83,9 +92,17 @@ def _load_raw(npz_path: Path) -> tuple[np.ndarray, np.ndarray]:
 
 
 class PointCloudDataset(Dataset):
-    def __init__(self, recordings_dir: str | Path, sample_ids: Sequence[str]):
+    def __init__(self, recordings_dir: str | Path, sample_ids: Sequence[str], augment: bool = False):
+        """augment: inject synthetic real-sensor noise (real_noise_augment.py)
+        into every sample -- ONLY meant for the training split. Deliberately
+        unseeded (fresh OS entropy each __getitem__ call): unlike the
+        existing padding logic elsewhere in this file, which needs the same
+        pad indices every epoch to keep training reproducible, augmentation
+        noise SHOULD differ epoch to epoch -- that's what makes it act as
+        augmentation rather than a fixed, memorizable corruption."""
         self.recordings_dir = Path(recordings_dir)
         self.sample_ids = list(sample_ids)
+        self.augment = augment
         if len(self.sample_ids) == 0:
             raise ValueError("sample_ids is empty")
 
@@ -95,7 +112,8 @@ class PointCloudDataset(Dataset):
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         sample_id = self.sample_ids[idx]
         npz_path = resolve_recording_path(self.recordings_dir, sample_id)
-        xyz, cls = _load_raw(npz_path)
+        augment_rng = np.random.default_rng() if self.augment else None
+        xyz, cls = _load_raw(npz_path, augment_rng=augment_rng)
         return torch.from_numpy(xyz), torch.from_numpy(cls)
 
 

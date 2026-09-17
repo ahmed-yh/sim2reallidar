@@ -53,6 +53,10 @@ def main():
     ap.add_argument("--init-from", type=Path, default=None,
                      help="Warm-start model weights from a previous best_multitask_model.pt. "
                           "NOT a true resume -- see train.py's --init-from docstring, same caveats apply.")
+    ap.add_argument("--augment-noise", action="store_true",
+                     help="Inject synthetic real-sensor noise (real_noise_augment.py) into "
+                          "TRAINING samples only -- see train.py's --augment-noise docstring, "
+                          "same domain-randomization motivation applies here.")
     args = ap.parse_args()
 
     args.outputs_dir.mkdir(parents=True, exist_ok=True)
@@ -74,8 +78,11 @@ def main():
     print(f"  done in {time.time() - t0:.1f}s -- counts: {class_counts}")
     print(f"  weights: {class_weights.tolist()}")
 
+    if args.augment_noise:
+        print("Synthetic real-sensor noise augmentation ENABLED for training samples "
+              "(see real_noise_augment.py)")
     train_loader = DataLoader(
-        RangeImageDataset(args.recordings_dir, train_ids, max_range),
+        RangeImageDataset(args.recordings_dir, train_ids, max_range, augment=args.augment_noise),
         batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers,
         pin_memory=(device.type == "cuda"),
     )

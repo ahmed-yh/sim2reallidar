@@ -27,10 +27,17 @@ N_COLS = 1024
 
 
 class RangeImageDataset(Dataset):
-    def __init__(self, recordings_dir: str | Path, sample_ids: Sequence[str], max_range: float):
+    def __init__(self, recordings_dir: str | Path, sample_ids: Sequence[str], max_range: float,
+                 augment: bool = False):
+        """augment: inject synthetic real-sensor noise (real_noise_augment.py)
+        into every sample -- ONLY meant for the training split. See
+        dataset.py's PointCloudDataset docstring for why this is
+        deliberately unseeded (fresh noise every epoch, unlike padding
+        elsewhere which needs to be reproducible)."""
         self.recordings_dir = Path(recordings_dir)
         self.sample_ids = list(sample_ids)
         self.max_range = max_range
+        self.augment = augment
         if len(self.sample_ids) == 0:
             raise ValueError("sample_ids is empty")
 
@@ -44,6 +51,12 @@ class RangeImageDataset(Dataset):
         x, y, z, intensity = d["x"], d["y"], d["z"], d["intensity"]
         x, y, z = x.reshape(N_RINGS, N_COLS), y.reshape(N_RINGS, N_COLS), z.reshape(N_RINGS, N_COLS)
         cls = np.rint(intensity).astype(np.int64).reshape(N_RINGS, N_COLS)
+
+        if self.augment:
+            from real_noise_augment import inject_real_sensor_noise
+            xyz = np.stack([x, y, z], axis=-1)
+            xyz = inject_real_sensor_noise(xyz, np.random.default_rng(), cls_grid=cls)
+            x, y, z = xyz[..., 0], xyz[..., 1], xyz[..., 2]
 
         valid = np.isfinite(x) & np.isfinite(y) & np.isfinite(z)
         range_ = np.zeros((N_RINGS, N_COLS), dtype=np.float32)
