@@ -1,0 +1,51 @@
+<!doctype html>
+<!-- data-theme="dark" is set in the markup, not by JS, so the very first paint
+     is already dark. Setting it from a script causes a white flash. The
+     prefers-color-scheme block in tokens.css still exists, so adding a
+     light-mode toggle later is a few lines. -->
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sim2Real LiDAR Perception — Thesis Demo</title>
+  <meta name="description" content="Three LiDAR encoder candidates compared in simulation and validated on real Ouster OS1-64 recordings.">
+
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/fonts.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/player.css">
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to content</a>
+
+  <nav id="nav" aria-label="Sections"></nav>
+  <main id="content"></main>
+  <footer id="footer"></footer>
+
+  <noscript>
+    <p style="max-width:70ch;margin:40px auto;padding:0 20px">
+      This demo needs JavaScript to render. The underlying figures are plain
+      images under <code>payloads/gallery/</code> and the recordings are
+      <code>.mp4</code> files under <code>payloads/media/</code>.
+    </p>
+  </noscript>
+
+  <!-- registry.js defines window.DEMO and must come first: every payload file
+       is a classic script that calls DEMO.register(...) as it loads. -->
+  <script src="assets/js/registry.js"></script>
+
+  <!-- The manifest loads eagerly rather than on demand -- it's ~8KB and every
+       section needs it. Everything heavier goes through DEMO.require(). -->
+  <script src="payloads/manifest.js"></script>
+
+  <script src="assets/js/util.js"></script>
+  <script src="assets/js/telemetry.js"></script>
+  <script src="assets/js/charts.js"></script>
+  <script src="assets/js/player.js"></script>
+  <!-- three.js + the 3D viewers are added in milestone B0/B1; sections.js
+       already dispatches "tunnel" and "pointcloud" types, so turning them on
+       is adding these scripts back plus the manifest entries. -->
+  <script src="assets/js/sections.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

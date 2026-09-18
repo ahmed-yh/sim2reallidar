@@ -1,0 +1,177 @@
+/* Frame-player component styles, adapted from viz/player_template.html.
+   Every id selector there (#playBtn, etc.) became a class scoped under
+   .player, because the demo mounts several players on one page and ids
+   would collide. */
+
+.player {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 250px;
+  gap: 14px;
+}
+@media (max-width: 860px) {
+  .player { grid-template-columns: 1fr; }
+}
+
+.player__viewport {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad-card);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.player__labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.player__imgwrap {
+  position: relative;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--track);
+  border: 1px solid var(--border);
+}
+.player__imgwrap img {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.player__panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad-card);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-self: start;
+}
+.player__panel h3 {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 0 0 8px;
+}
+.player__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+.player__row:last-child { border-bottom: none; }
+.player__row .k { color: var(--text-dim); }
+.player__row .v { font-weight: 500; text-align: right; }
+
+.player__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 0.8rem;
+  transition: opacity 0.15s ease;
+}
+.player__legend-item.inactive { opacity: 0.32; }
+.player__legend-swatch { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+.player__legend-name { flex: 1; }
+.player__legend-count { color: var(--text-dim); font-size: 0.74rem; }
+.player__legend-item.inactive .player__legend-count { visibility: hidden; }
+
+.player__transport {
+  grid-column: 1 / -1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.player__transport button {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 7px;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.player__transport button:hover { border-color: var(--accent); }
+.player__transport button svg { width: 14px; height: 14px; fill: var(--text); }
+.player__play {
+  width: 40px !important; height: 40px !important;
+  background: var(--accent-soft) !important;
+  border-color: var(--accent) !important;
+}
+.player__play svg { fill: var(--accent) !important; width: 15px !important; height: 15px !important; }
+
+.player__scrubwrap { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.player input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--track);
+  cursor: pointer;
+}
+.player input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+.player input[type="range"]::-moz-range-thumb {
+  width: 13px; height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  cursor: pointer;
+}
+.player__scrublabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+.player select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.player__source {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.player__source code {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text);
+}

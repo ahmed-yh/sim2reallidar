@@ -1,0 +1,64 @@
+/* Design tokens, lifted verbatim from viz/player_template.html so the demo
+   page and the frame players read as one product rather than two.
+
+   Three blocks on purpose: a light `:root` default, an automatic dark override
+   for people whose OS asks for it, and an explicit [data-theme="dark"] that
+   wins in both directions. index.html sets data-theme="dark" in the markup
+   (not via JS) so the first paint is already dark -- no flash.
+
+   The Google Fonts @import that lived here is deliberately gone: it broke the
+   offline case (the page silently fell back to system-ui), and for a page
+   hosted by a German university it also hands every visitor's IP to a US CDN.
+   Fonts are self-hosted in fonts.css instead. */
+
+:root {
+  --bg: #eef1f3;
+  --surface: #ffffff;
+  --surface-2: #e4e9ec;
+  --border: #cdd5da;
+  --text: #17222b;
+  --text-dim: #5b6b76;
+  --accent: #0f9c8f;
+  --accent-soft: #0f9c8f22;
+  --warm: #c9761f;
+  --danger: #c94f3a;
+  --track: #d3dade;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a0e12;
+    --surface: #10161c;
+    --surface-2: #171f27;
+    --border: #263039;
+    --text: #e8edf1;
+    --text-dim: #7c8894;
+    --accent: #4fd1c5;
+    --accent-soft: #4fd1c522;
+    --warm: #f2a65a;
+    --danger: #e8705a;
+    --track: #1e2830;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0a0e12;
+  --surface: #10161c;
+  --surface-2: #171f27;
+  --border: #263039;
+  --text: #e8edf1;
+  --text-dim: #7c8894;
+  --accent: #4fd1c5;
+  --accent-soft: #4fd1c522;
+  --warm: #f2a65a;
+  --danger: #e8705a;
+  --track: #1e2830;
+}
+
+/* Additions the multi-section page needs that a single player didn't. */
+:root {
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --maxw: 1500px;
+  --radius: 10px;
+  --pad-card: 14px;
+  --nav-h: 52px;
+}

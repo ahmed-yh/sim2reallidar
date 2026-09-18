@@ -1,0 +1,37 @@
+# Build context exclusions for docker/pipeline.Dockerfile.
+#
+# Without this file the context includes real_bags/, whose single bag3 .db3 is
+# 15.9 GB -- `docker build` would appear to hang for many minutes uploading it
+# and can run the daemon out of disk. The pipeline service gets this data via
+# volume mounts at RUN time (see docker-compose.yml), so excluding it from the
+# IMAGE is correct, not a compromise.
+
+.git/
+.github/
+
+# Large data -- mounted at runtime, never baked into the image
+real_bags/
+scenario_data/
+data/
+outputs/
+*.ply
+*.mp4
+*.db3
+
+# Generated demo payloads: the demo image builds from ./demo as its own
+# context, and the pipeline image regenerates these into a mounted volume.
+demo/payloads/players/frames/
+demo/payloads/media/
+demo/payloads/tunnel/
+
+# Generated playback pages (10-18 MB each)
+viz/*_playback.html
+
+# Local env
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+*.log

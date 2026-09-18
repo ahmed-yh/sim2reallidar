@@ -1,0 +1,13 @@
+/* GENERATED FILE — do not edit by hand.
+ * Rebuild with:  python demo/build_demo.py --fonts
+ *
+ * Currently a placeholder: the real build inlines IBM Plex Sans (400/600) and
+ * IBM Plex Mono (400/500) as base64 woff2 data: URIs. data: is used rather
+ * than url(../fonts/x.woff2) because some Chrome builds block font files over
+ * file://, which is exactly the delivery mode an examiner will use.
+ *
+ * Until then the stacks in tokens.css fall back to system-ui / ui-monospace,
+ * which look fine — just not identical to the rest of the project's figures.
+ */
+
+/* placeholder: no @font-face yet; --font-sans / --font-mono fall back */

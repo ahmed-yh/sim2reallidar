@@ -1,0 +1,366 @@
+/* Page chrome: nav, sections, cards, tables, hero. Reuses the card/heading
+   vocabulary from viz/player_template.html so sections and embedded players
+   share one visual language. */
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; animation: none !important; }
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  margin: 0;
+  min-height: 100vh;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+a { color: var(--accent); }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--surface);
+  color: var(--text);
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  z-index: 100;
+}
+.skip-link:focus { left: 12px; top: 12px; }
+
+/* ---------------------------------------------------------------- nav ---- */
+
+nav#nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: var(--nav-h);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+@supports (backdrop-filter: blur(8px)) {
+  nav#nav {
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter: blur(8px);
+  }
+}
+nav#nav .nav-brand {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-right: 14px;
+  white-space: nowrap;
+}
+nav#nav a {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s;
+}
+nav#nav a:hover { color: var(--text); background: var(--surface-2); }
+nav#nav a[aria-current="true"] { color: var(--accent); background: var(--accent-soft); }
+
+/* ----------------------------------------------------------- sections ---- */
+
+main {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 20px 96px;
+}
+
+section {
+  padding: 56px 0 8px;
+  scroll-margin-top: calc(var(--nav-h) + 16px);
+  border-bottom: 1px solid var(--border);
+}
+section:last-of-type { border-bottom: none; }
+
+.section-head { margin-bottom: 18px; }
+.section-kicker {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+}
+.section-blurb {
+  color: var(--text-dim);
+  max-width: 78ch;
+  font-size: 0.92rem;
+}
+.section-blurb p { margin: 0 0 8px; }
+
+h2.panel-heading {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 0 0 10px;
+}
+
+/* -------------------------------------------------------------- cards ---- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--pad-card);
+}
+
+.note {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+  margin: 14px 0 0;
+}
+.note strong { color: var(--text); font-weight: 600; }
+
+/* --------------------------------------------------------------- hero ---- */
+
+.hero {
+  padding: 72px 0 40px;
+  border-bottom: 1px solid var(--border);
+}
+.hero h1 {
+  font-size: clamp(1.9rem, 4.2vw, 3rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 14px;
+  max-width: 24ch;
+  line-height: 1.15;
+}
+.hero .hero-sub {
+  font-size: 1.02rem;
+  color: var(--text-dim);
+  max-width: 70ch;
+  margin: 0 0 30px;
+}
+.hero-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px 28px;
+  margin-bottom: 26px;
+}
+.hero-meta .k {
+  display: block;
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 3px;
+}
+.hero-meta .v { font-size: 0.92rem; }
+.hero-jump { display: flex; flex-wrap: wrap; gap: 8px; }
+.hero-jump a {
+  font-size: 0.82rem;
+  text-decoration: none;
+  color: var(--text);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 7px 13px;
+  border-radius: 999px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.hero-jump a:hover { border-color: var(--accent); color: var(--accent); }
+
+.disclaimer {
+  margin-top: 26px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  max-width: 82ch;
+}
+.disclaimer strong { color: var(--text); }
+
+/* ------------------------------------------------------------- tables ---- */
+
+.table-wrap { overflow-x: auto; }
+
+table.metrics {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+table.metrics th,
+table.metrics td {
+  text-align: right;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+table.metrics th:first-child,
+table.metrics td:first-child { text-align: left; }
+table.metrics thead th {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border-bottom-color: var(--border);
+}
+table.metrics tbody tr:hover { background: var(--surface-2); }
+table.metrics td.null { color: var(--text-dim); font-style: italic; }
+table.metrics .model-name { font-weight: 600; }
+table.metrics .model-family {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.badge.winner { background: var(--accent-soft); color: var(--accent); }
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 8px;
+  vertical-align: baseline;
+}
+
+/* bar strip inside a metrics cell */
+.bar-cell { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+.bar-track {
+  flex: 0 0 82px;
+  height: 5px;
+  background: var(--track);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bar-fill { height: 100%; background: var(--accent); border-radius: 3px; }
+
+/* --------------------------------------------------------------- tabs ---- */
+
+.tabs { margin-top: 4px; }
+.tablist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.tab {
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 15px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.tab:hover { color: var(--text); }
+.tab[aria-selected="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ------------------------------------------------------------ gallery ---- */
+
+.facets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.panes { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 1000px) { .panes.two { grid-template-columns: 1fr 1fr; } }
+.pane img { width: 100%; height: auto; display: block; border-radius: 6px; }
+.pane .pane-label {
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+/* -------------------------------------------------------------- video ---- */
+
+.video-wrap video {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+  background: #000;
+}
+.video-fallback {
+  padding: 22px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+
+.caption {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-top: 10px;
+}
+
+/* ------------------------------------------------------------- footer ---- */
+
+footer#footer {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 26px 20px 60px;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.skeleton {
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 0.84rem;
+}

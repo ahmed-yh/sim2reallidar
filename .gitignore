@@ -3,25 +3,36 @@ __pycache__/
 *.pt
 *.pth
 
+# NOTE: the big-data excludes below are ROOT-ANCHORED (leading "/") on purpose.
+# Unanchored, "data/" matches any directory named data at any depth -- which
+# silently swallowed demo/data/, so the demo's payloads were invisible to git
+# and would have 404'd on GitHub Pages while working fine locally. Keep the
+# leading slash on anything that names a top-level data directory.
+
 # Regenerated locally from data_prep/parse_recordings.py + split.py against
 # the raw scenario recordings -- not source, don't version 134MB+ of derived
 # arrays. See README "Reproducing data/" for the exact commands.
-data/
+/data/
 
 # Raw scenario recordings (~496MB) -- code-only repo by design (see README
 # "Getting scenario_data/ onto another machine"). Synced separately, not via
 # git -- this much binary data doesn't belong in a GitHub repo's history.
-scenario_data/
+/scenario_data/
 
 # Real ROS2 bags transferred from the Ouster OS1 robot for sim2real
 # evaluation -- tens of GB, same reasoning as scenario_data/ above. Synced
 # separately (scp), not via git.
-real_bags/
+/real_bags/
 
 # training artifacts
-outputs/
-runs/
+/outputs/
+/runs/
 *.log
+
+# Source geometry for the demo's tunnel section: the raw CloudCompare/Blender
+# exports (tens of MB each). demo/build_demo.py decimates and quantizes these
+# into demo/payloads/tunnel/, and it's the decimated payload that ships.
+/*.ply
 
 .venv/
 venv/
