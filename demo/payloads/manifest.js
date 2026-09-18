@@ -88,6 +88,13 @@ DEMO.register("manifest", "main", {
       "blurb": "<p>Trained entirely in simulation, then handed scans from a real Ouster OS1-64 on a Clearpath Jackal. Nothing was retrained or adapted for this.</p><p><strong>There is no ground truth here.</strong> Real LiDAR carries no semantic labels, so the class row is the model's own prediction with nothing to check it against — which is exactly why the honest claim from this section is qualitative. Predictions are shown at confidence ≥ 0.97, a display threshold chosen by sweeping against the labelled <em>simulated</em> test set; below it a point renders as environment.</p>",
       "tabs": [
         {
+          "label": "Video",
+          "type": "video",
+          "src": "media/bag3_pointnet2.mp4",
+          "poster": "media/bag3_pointnet2.poster.jpg",
+          "caption": "bag3_20260910_152806 · real Ouster OS1-64 · PointNet++ · played at the bag's own scan rate"
+        },
+        {
           "label": "Frame player",
           "type": "player",
           "payloadId": "bag3_pointnet2",

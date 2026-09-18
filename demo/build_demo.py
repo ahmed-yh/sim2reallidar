@@ -248,6 +248,48 @@ def export_bag_player(cfg: dict) -> str:
     return f"{cfg['id']}: {stats['n_frames']} frames -> {out.relative_to(DEMO_DIR)}"
 
 
+def export_media(cfg: dict) -> str:
+    """Transcode a rendered .mp4 into something a browser can actually play,
+    and grab a poster frame.
+
+    This is not optional polish. run_inference_on_bag.py wrote its videos with
+    cv2.VideoWriter_fourcc(*"mp4v"), which is MPEG-4 Part 2 -- verified by
+    reading the ISO-BMFF sample-entry box on both files. No browser decodes
+    that in <video>; it renders a black rectangle with no error. H.264 High/Main
+    + yuv420p is the combination that plays everywhere, and +faststart moves
+    the index to the front so it begins before the whole file arrives.
+    """
+    import subprocess
+    import imageio_ffmpeg
+
+    src = need(REPO_ROOT / cfg["src"], f"source video for {cfg['id']}")
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    out_dir = PAYLOADS / "media"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"{cfg['id']}.mp4"
+    poster = out_dir / f"{cfg['id']}.poster.jpg"
+
+    cmd = [ffmpeg, "-y", "-i", str(src)]
+    if cfg.get("maxSeconds"):
+        cmd += ["-t", str(cfg["maxSeconds"])]
+    cmd += [
+        "-c:v", "libx264", "-profile:v", "main", "-pix_fmt", "yuv420p",
+        "-crf", str(cfg.get("crf", 23)), "-preset", "slow",
+        "-movflags", "+faststart", "-an", str(out),
+    ]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"ffmpeg failed: {r.stderr.strip().splitlines()[-1] if r.stderr else '?'}")
+
+    subprocess.run([ffmpeg, "-y", "-ss", str(cfg.get("posterAt", 2.0)), "-i", str(out),
+                    "-frames:v", "1", "-q:v", "3", str(poster)],
+                   capture_output=True, text=True)
+
+    before, after = src.stat().st_size, out.stat().st_size
+    return (f"{cfg['id']}: {before/1e6:.1f} MB mp4v -> {after/1e6:.1f} MB h264"
+            f" -> {out.relative_to(DEMO_DIR)}")
+
+
 def export_gallery(cfg: dict) -> str:
     copied = 0
     for src_rel in cfg.get("from", []):
@@ -318,6 +360,7 @@ def cmd_report() -> int:
 EXPORTERS = {
     "sim_player": ("simPlayers", export_sim_player),
     "bag_player": ("bagPlayers", export_bag_player),
+    "media": ("media", export_media),
     "gallery": ("gallery", export_gallery),
 }
 

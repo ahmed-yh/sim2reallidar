@@ -101,6 +101,29 @@ def rendered_frames(all_frames, runner, t0, progress_every):
               f"horizontal resolution setting.")
 
 
+def _open_video_writer(cv2, out_path, fps, w, h):
+    """Prefer H.264 ('avc1'); fall back to 'mp4v' with a loud warning.
+
+    This matters more than it looks: 'mp4v' is MPEG-4 Part 2, which NO browser
+    decodes in a <video> tag -- it shows a black rectangle and reports no
+    error. Every video this script produced before this change had that defect,
+    and it was only caught by reading the files' sample-entry boxes. Many
+    opencv-python wheels ship without an H.264 encoder (licensing), hence the
+    fallback and the warning telling you how to fix the result.
+    """
+    writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*"avc1"), fps, (w, h))
+    if writer.isOpened():
+        return writer
+    writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+    print("WARNING: this OpenCV build has no H.264 encoder, so the video is being written\n"
+          "         as MPEG-4 Part 2 (mp4v), which browsers CANNOT play in a <video> tag.\n"
+          "         It is fine for a desktop player. To make it web-playable, transcode:\n"
+          "           ffmpeg -i out.mp4 -c:v libx264 -profile:v main -pix_fmt yuv420p \\\n"
+          "                  -crf 23 -movflags +faststart web.mp4\n"
+          "         (demo/build_demo.py --only media does exactly this.)")
+    return writer
+
+
 def bag_frames_payload(*, bag, topic, runner, max_frames=None, frame_sink=None,
                         upscale=1, progress_every=50):
     """Same {"frames", "meta", "stats"} shape build_playback_payload returns,
@@ -198,7 +221,7 @@ def main():
             frame = np.concatenate([bar, combined], axis=0)
             if writer is None:
                 h, w = frame.shape[:2]
-                writer = cv2.VideoWriter(str(args.out_video), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+                writer = _open_video_writer(cv2, args.out_video, fps, w, h)
             writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
 
         if writer is None:
