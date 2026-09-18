@@ -76,18 +76,22 @@ def iter_pointcloud2(bag_path: Path, topic: str):
 
 
 def rendered_frames(all_frames, runner, t0, progress_every):
-    """Yields (index, seconds_since_start, visualization, recon_mse) for every
+    """Yields (index, seconds_since_start, visualization, detail_dict) for every
     scan whose grid shape matches what the models were trained on, skipping
     (and warning once about) any that don't. Shared by both output paths --
     the .mp4 writer and the HTML page differ only in what they do with each
-    rendered frame, not in how one gets produced."""
+    rendered frame, not in how one gets produced.
+
+    detail_dict is ModelRunner.run_detailed()'s result minus the image: "mse",
+    plus "pred_class_counts" when the model has a classifier."""
     n_shape_mismatch = 0
     for i, (t_ns, height, width, xyz) in enumerate(all_frames):
         if height != N_RINGS or width != N_COLS:
             n_shape_mismatch += 1
             continue
-        combined, mse = runner.run(xyz)
-        yield i, (t_ns - t0) / 1e9, combined, mse
+        detail = runner.run_detailed(xyz)
+        combined = detail.pop("image")
+        yield i, (t_ns - t0) / 1e9, combined, detail
         if (i + 1) % progress_every == 0:
             print(f"  processed {i + 1}/{len(all_frames)}")
 
@@ -95,6 +99,47 @@ def rendered_frames(all_frames, runner, t0, progress_every):
         print(f"WARNING: skipped {n_shape_mismatch} scans with shape != "
               f"({N_RINGS},{N_COLS}) -- check your OS1's channel count / "
               f"horizontal resolution setting.")
+
+
+def bag_frames_payload(*, bag, topic, runner, max_frames=None, frame_sink=None,
+                        upscale=1, progress_every=50):
+    """Same {"frames", "meta", "stats"} shape build_playback_payload returns,
+    for a real bag instead of a simulated scenario -- so one demo exporter and
+    one player component serve both.
+
+    Real bags carry no odometry-derived x/y/dist and no ground-truth classes,
+    so those keys are simply absent from meta here. That is exactly why the
+    player derives its telemetry rows from the payload instead of assuming a
+    fixed set: the old page assumed, and threw on frame 0.
+    """
+    from playback_common import encode_frame
+
+    all_frames = list(iter_pointcloud2(bag, topic))
+    if not all_frames:
+        raise SystemExit("no scans found -- check --topic against the bag's actual topics")
+    if max_frames and len(all_frames) > max_frames:
+        idx = np.linspace(0, len(all_frames) - 1, max_frames).round().astype(int)
+        all_frames = [all_frames[i] for i in sorted(set(idx.tolist()))]
+
+    t0 = all_frames[0][0]
+    out_frames, meta = [], []
+    for i, t_s, combined, detail in rendered_frames(all_frames, runner, t0, progress_every):
+        out_frames.append(frame_sink(len(out_frames), combined) if frame_sink
+                          else encode_frame(combined, upscale=upscale))
+        entry = {"t": t_s}
+        entry.update({k: v for k, v in detail.items() if v is not None})
+        meta.append(entry)
+
+    if not meta:
+        raise SystemExit(f"no scans matched the expected ({N_RINGS},{N_COLS}) shape")
+
+    duration_s = meta[-1]["t"] - meta[0]["t"]
+    means = {"mse": float(np.mean([m["mse"] for m in meta]))}
+    return {
+        "frames": out_frames, "meta": meta,
+        "stats": {"n_frames": len(meta), "n_raw_available": len(all_frames),
+                  "duration_s": duration_s, "means": means},
+    }
 
 
 def main():
@@ -145,7 +190,8 @@ def main():
               f"{len(all_frames)} scans over {total_s:.1f}s)")
 
         writer, mses = None, []
-        for i, t_s, combined, mse in rendered_frames(all_frames, runner, t0, progress_every=50):
+        for i, t_s, combined, detail in rendered_frames(all_frames, runner, t0, progress_every=50):
+            mse = detail["mse"]
             mses.append(mse)
             bar = label_row(np.full((18, combined.shape[1], 3), 14, dtype=np.uint8),
                              f"t={t_s:6.1f}s  frame {i + 1}/{len(all_frames)}  recon mse {mse:.4f}")
@@ -163,9 +209,9 @@ def main():
         return
 
     frames_b64, meta = [], []
-    for _i, t_s, combined, mse in rendered_frames(all_frames, runner, t0, progress_every=20):
+    for _i, t_s, combined, detail in rendered_frames(all_frames, runner, t0, progress_every=20):
         frames_b64.append(encode_frame(combined, upscale=2))
-        meta.append({"t": t_s, "mse": mse})
+        meta.append({"t": t_s, "mse": detail["mse"]})
 
     if not frames_b64:
         raise SystemExit("no scans matched the expected (64,1024) shape -- nothing to render")

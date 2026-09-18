@@ -102,18 +102,41 @@ class ModelRunner:
         autoencoder_mod = importlib.import_module("kevin_denkwelt_models.autoencoder")
         return autoencoder_mod.build_autoencoder, kevin_deploy
 
-    @torch.no_grad()
     def run(self, xyz_grid: np.ndarray) -> tuple[np.ndarray, float]:
         """xyz_grid: (64,1024,3) float32, NaN (or non-finite) for no-return.
         Returns (combined visualization image (H,W,3) uint8, reconstruction
-        MSE in the shared normalized units)."""
+        MSE in the shared normalized units).
+
+        Kept as a 2-tuple so live_inference_node.py is unaffected; callers that
+        want the per-class breakdown use run_detailed()."""
+        d = self.run_detailed(xyz_grid)
+        return d["image"], d["mse"]
+
+    # no_grad lives HERE, not on run(): run_detailed is the real entry point
+    # and the demo exporter calls it directly. On run() alone, a direct
+    # run_detailed() call would build a graph for every frame and grow memory
+    # across a few thousand of them.
+    @torch.no_grad()
+    def run_detailed(self, xyz_grid: np.ndarray) -> dict:
+        """As run(), plus "pred_class_counts": {class_id: n_points} over the
+        THRESHOLDED predictions, or None for a model with no classifier.
+
+        These are predictions, not ground truth -- real LiDAR carries no
+        laser_retro, so there is nothing to check them against. Anything
+        displaying them has to say so.
+        """
         if self.model_name == "pointnet2":
             return self._run_pointnet2(xyz_grid)
         if self.model_name == "salsanext":
             return self._run_salsanext(xyz_grid)
         return self._run_kevin(xyz_grid)
 
-    def _run_pointnet2(self, xyz_grid: np.ndarray) -> tuple[np.ndarray, float]:
+    @staticmethod
+    def _class_counts(pred_grid: np.ndarray) -> dict:
+        ids, counts = np.unique(pred_grid, return_counts=True)
+        return {int(i): int(c) for i, c in zip(ids.tolist(), counts.tolist())}
+
+    def _run_pointnet2(self, xyz_grid: np.ndarray) -> dict:
         # Same azimuth-stride-2 decimation dataset.py's _load_raw uses, but
         # WITHOUT the training-time random padding to a fixed point count --
         # that padding exists only to keep a training BATCH's tensor shapes
@@ -156,9 +179,10 @@ class ModelRunner:
             label_row(range_rgb(recon_range_grid), "RECONSTRUCTED RANGE"), gap,
             label_row(class_rgb(pred_grid), "PREDICTED CLASS (no ground truth on real data)"),
         ], axis=0)
-        return combined, mse
+        return {"image": combined, "mse": mse,
+                "pred_class_counts": self._class_counts(pred_grid)}
 
-    def _run_salsanext(self, xyz_grid: np.ndarray) -> tuple[np.ndarray, float]:
+    def _run_salsanext(self, xyz_grid: np.ndarray) -> dict:
         range_ = np.linalg.norm(xyz_grid, axis=-1)
         valid = np.isfinite(range_) & (range_ > 1e-3)  # (0,0,0)-for-no-return safety net, see module note
         range_n = np.where(valid, np.clip(range_, 0, self.max_range) / self.max_range, 0.0)
@@ -184,9 +208,10 @@ class ModelRunner:
             label_row(range_rgb(recon_display), "RECONSTRUCTED RANGE"), gap,
             label_row(class_rgb(pred_cls), "PREDICTED CLASS (no ground truth on real data)"),
         ], axis=0)
-        return combined, mse
+        return {"image": combined, "mse": mse,
+                "pred_class_counts": self._class_counts(pred_cls)}
 
-    def _run_kevin(self, xyz_grid: np.ndarray) -> tuple[np.ndarray, float]:
+    def _run_kevin(self, xyz_grid: np.ndarray) -> dict:
         range_ = np.linalg.norm(xyz_grid, axis=-1)
         valid = np.isfinite(range_) & (range_ > 1e-3)
         range_n = np.where(valid, np.clip(range_, 0, self.max_range) / self.max_range, 0.0).astype(np.float32)
@@ -203,4 +228,5 @@ class ModelRunner:
             label_row(range_rgb(orig_display), "ORIGINAL RANGE (real, measured)"), gap,
             label_row(range_rgb(recon_display), "RECONSTRUCTED RANGE"),
         ], axis=0)
-        return combined, mse
+        # No classifier in this candidate, so nothing to count.
+        return {"image": combined, "mse": mse, "pred_class_counts": None}

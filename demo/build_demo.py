@@ -199,6 +199,55 @@ def frames_descriptor(cfg: dict, frames) -> dict:
     return {"mode": "inline", "format": "png", "data": frames, "count": len(frames)}
 
 
+def export_bag_player(cfg: dict) -> str:
+    """One real-bag playback. Needs the bag itself (tens of GB, gitignored), so
+    this is the exporter most likely to skip on any machine but the one that
+    recorded them."""
+    import torch  # noqa: F401
+    from playback_common import derive_legend, derive_telemetry_fields
+
+    sys.path.insert(0, str(REPO_ROOT / "ros2_inference"))
+    from _shared_inference import ModelRunner
+    from run_inference_on_bag import bag_frames_payload
+
+    bag = need(REPO_ROOT / cfg["bag"], f"bag for {cfg['id']}")
+    ckpt = need(REPO_ROOT / cfg["checkpoint"], f"checkpoint for {cfg['id']}")
+
+    runner = ModelRunner(cfg["model"], ckpt, cfg.get("maxRange", 14.425209045410156),
+                         class_conf_threshold=cfg.get("classThreshold", 0.97))
+
+    frames_dir = PAYLOADS / "players" / "frames" / cfg["id"]
+    sink = png_frame_sink(frames_dir, cfg.get("upscale", 1)) if cfg.get("frameMode") == "files" else None
+
+    built = bag_frames_payload(
+        bag=bag, topic=cfg.get("topic", "/ouster/points"), runner=runner,
+        max_frames=cfg.get("maxFrames"), frame_sink=sink, upscale=cfg.get("upscale", 1),
+    )
+    meta, stats = built["meta"], built["stats"]
+
+    payload = {
+        "schemaVersion": 1,
+        "id": cfg["id"], "kind": "real",
+        "title": cfg.get("title", cfg["id"]),
+        "subtitle": cfg.get("subtitle", ""),
+        "source": {
+            "model": cfg["model"], "checkpoint": Path(cfg["checkpoint"]).name,
+            "scenarioId": None, "bag": Path(cfg["bag"]).name,
+            "classConfThreshold": cfg.get("classThreshold", 0.97),
+            "nFrames": stats["n_frames"], "nRawAvailable": stats["n_raw_available"],
+            "durationS": round(stats["duration_s"], 1),
+        },
+        "rows": cfg.get("rows", []),
+        "telemetryFields": derive_telemetry_fields(meta),
+        "legend": derive_legend(meta, caption=cfg.get("legendCaption")),
+        "frames": frames_descriptor(cfg, built["frames"]),
+        "meta": meta,
+        "stats": stats["means"],
+    }
+    out = write_payload(f"players/{cfg['id']}.js", "player", cfg["id"], payload)
+    return f"{cfg['id']}: {stats['n_frames']} frames -> {out.relative_to(DEMO_DIR)}"
+
+
 def export_gallery(cfg: dict) -> str:
     copied = 0
     for src_rel in cfg.get("from", []):
@@ -268,6 +317,7 @@ def cmd_report() -> int:
 
 EXPORTERS = {
     "sim_player": ("simPlayers", export_sim_player),
+    "bag_player": ("bagPlayers", export_bag_player),
     "gallery": ("gallery", export_gallery),
 }
 

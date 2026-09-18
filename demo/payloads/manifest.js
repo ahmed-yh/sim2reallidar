@@ -78,6 +78,22 @@ DEMO.register("manifest", "main", {
       "blurb": "<p>A single held-out drive through the simulated corridor, played at the recording's real rate. The top two rows are the measured range image and the encoder's reconstruction of it; the bottom two are the ground-truth semantic labels and the model's predictions. Every frame states which split it belongs to, so you can see it behaving the same on data it never trained on.</p>",
       "payloadId": "pointnet2_sim",
       "src": "players/pointnet2_sim.js"
+    },
+
+    {
+      "id": "sim2real",
+      "type": "tabs",
+      "nav": "Sim2real",
+      "title": "The same encoder, on a real sensor",
+      "blurb": "<p>Trained entirely in simulation, then handed scans from a real Ouster OS1-64 on a Clearpath Jackal. Nothing was retrained or adapted for this.</p><p><strong>There is no ground truth here.</strong> Real LiDAR carries no semantic labels, so the class row is the model's own prediction with nothing to check it against — which is exactly why the honest claim from this section is qualitative. Predictions are shown at confidence ≥ 0.97, a display threshold chosen by sweeping against the labelled <em>simulated</em> test set; below it a point renders as environment.</p>",
+      "tabs": [
+        {
+          "label": "Frame player",
+          "type": "player",
+          "payloadId": "bag3_pointnet2",
+          "src": "players/bag3_pointnet2.js"
+        }
+      ]
     }
   ]
 });
