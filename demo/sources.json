@@ -1,0 +1,106 @@
+{
+  "_comment": [
+    "What the demo exports. This file is the 'adding a model is a data change'",
+    "lever: a fourth candidate needs a render function and an entry here, not",
+    "new exporter code. `renderer` is a 'module:function' string resolved at",
+    "export time, so build_demo.py never imports a model it wasn't asked for.",
+    "",
+    "Paths are relative to the repo root. Anything missing is SKIPPED with a",
+    "message rather than failing the run -- checkpoints, scenario_data/ and the",
+    "real bags are all gitignored, so a fresh clone can still build the parts",
+    "it has."
+  ],
+
+  "simPlayers": [
+    {
+      "id": "pointnet2_sim",
+      "title": "PointNet++ on a simulated drive",
+      "subtitle": "original vs. reconstructed range, ground-truth vs. predicted class",
+      "model": "pointnet2",
+      "renderer": "gen_playback_pointnet2:render_pointnet2_frame",
+      "checkpoint": "outputs/pointnet2_checkpoints/epoch39_multitask_model.pt",
+      "scenarioId": "122e86f0-8b3f-46f5-8eaa-9f6b1232c7df",
+      "maxFrames": 160,
+      "upscale": 1,
+      "frameMode": "files",
+      "rows": [
+        { "label": "Original range", "channel": "range" },
+        { "label": "Reconstructed range (reprojected)", "channel": "range" },
+        { "label": "Original class (ground truth)", "channel": "class" },
+        { "label": "Predicted class", "channel": "class" }
+      ],
+      "legendCaption": "Objects in this frame (ground truth)"
+    },
+    {
+      "id": "kevin_sim",
+      "title": "CNN autoencoder on the same drive",
+      "subtitle": "reconstruction only — this candidate has no classifier",
+      "model": "kevin_cnn",
+      "renderer": "gen_playback_kevin:render_kevin_frame",
+      "checkpoint": "outputs/kevin_cnn/best_autoencoder.pt",
+      "scenarioId": "122e86f0-8b3f-46f5-8eaa-9f6b1232c7df",
+      "maxFrames": 160,
+      "upscale": 1,
+      "frameMode": "files",
+      "rows": [
+        { "label": "Original range", "channel": "range" },
+        { "label": "Reconstructed range (native, no reprojection)", "channel": "range" },
+        { "label": "Original class (no classifier in this candidate)", "channel": "class" }
+      ],
+      "legendCaption": "Objects in this frame (ground truth — not predicted)"
+    }
+  ],
+
+  "bagPlayers": [
+    {
+      "id": "bag3_pointnet2",
+      "title": "PointNet++ on a real Ouster recording",
+      "subtitle": "no ground truth exists on real data — the class row is the model's own prediction",
+      "model": "pointnet2",
+      "bag": "real_bags/bag3_20260910_152806",
+      "topic": "/ouster/points",
+      "checkpoint": "outputs/pointnet2_checkpoints/epoch39_multitask_model.pt",
+      "maxFrames": 200,
+      "upscale": 1,
+      "classThreshold": 0.97,
+      "frameMode": "files",
+      "rows": [
+        { "label": "Original range (real, measured)", "channel": "range" },
+        { "label": "Reconstructed range", "channel": "range" },
+        { "label": "Predicted class", "channel": "class" }
+      ],
+      "legendCaption": "Predicted objects (no ground truth on real data)"
+    }
+  ],
+
+  "media": [
+    {
+      "id": "bag3_pointnet2",
+      "src": "real_bags/bag3_pointnet2_fixed.mp4",
+      "crf": 23,
+      "maxSeconds": null,
+      "posterAt": 4.0
+    }
+  ],
+
+  "gallery": {
+    "from": ["outputs/pointnet2/range_heatmaps", "outputs/pointnet2/recon_viz"]
+  },
+
+  "pointclouds": [
+    {
+      "id": "pointnet2_recon",
+      "checkpoint": "outputs/pointnet2/best_multitask_model.pt",
+      "envSubsample": 6000,
+      "decimals": 3
+    }
+  ],
+
+  "tunnel": {
+    "id": "tunnel",
+    "pointcloud": "../../noslil.ply",
+    "mesh": "2.ply",
+    "maxPoints": 400000,
+    "maxFaces": 200000
+  }
+}

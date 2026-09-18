@@ -68,6 +68,16 @@ DEMO.register("manifest", "main", {
       "title": "Where PointNet++ actually finds the objects",
       "blurb": "<p>Overall point accuracy is a misleading headline here: about 99% of every scan is environment, so a model that predicted \"environment\" everywhere would still score ~99%. The per-class numbers are the real signal.</p>",
       "path": "perClass"
+    },
+
+    {
+      "id": "sim_playback",
+      "type": "player",
+      "nav": "Simulated drive",
+      "title": "Watching it run, frame by frame",
+      "blurb": "<p>A single held-out drive through the simulated corridor, played at the recording's real rate. The top two rows are the measured range image and the encoder's reconstruction of it; the bottom two are the ground-truth semantic labels and the model's predictions. Every frame states which split it belongs to, so you can see it behaving the same on data it never trained on.</p>",
+      "payloadId": "pointnet2_sim",
+      "src": "players/pointnet2_sim.js"
     }
   ]
 });

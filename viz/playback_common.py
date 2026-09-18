@@ -136,22 +136,90 @@ def even_subsample(frames: list[dict], max_frames: int | None) -> list[dict]:
     return [frames[i] for i in sorted(set(idx.tolist()))]
 
 
-def run_playback(*, scenario_id: str, recordings_dir: Path, sim_dir: Path, out_path: Path,
-                  max_frames: int | None, upscale: int, checkpoint_name: str,
-                  render_fn, build_replacements) -> None:
-    """Drives one full playback: walk a scenario's scans in time order, render
-    each through `render_fn`, and write the self-contained player page.
+# Display metadata for the scalars a render_fn can report, so both the legacy
+# HTML player and the demo page describe the same field the same way. Order is
+# the order rows appear in the telemetry panel.
+TELEMETRY_SPECS = {
+    "t":     {"label": "Time",     "format": "time"},
+    "pos":   {"label": "Position", "format": "xy", "from": ["x", "y"], "unit": "m"},
+    "dist":  {"label": "Distance", "format": "meters", "digits": 1},
+    "split": {"label": "Split (train/val/test/unused)", "format": "text"},
+    "mse":   {"label": "Recon MSE (norm.)",    "format": "fixed",   "digits": 4},
+    "acc":   {"label": "Per-point class acc.", "format": "percent", "digits": 1},
+}
+TELEMETRY_ORDER = ["t", "pos", "dist", "split", "mse", "acc"]
 
-    The per-candidate scripts differ only in how a single frame is rendered
-    and what the page is captioned -- everything else (frame selection,
-    odometry distance, train/val/test attribution, template patching) is the
-    same work, so it lives here once instead of in each of them.
+# Consumed by the legend, not the telemetry rows.
+_COUNT_KEYS = ("class_counts", "pred_class_counts")
+
+
+def derive_telemetry_fields(meta: list[dict]) -> list[dict]:
+    """Describe only the telemetry a given set of frames can actually support.
+
+    A field is emitted iff EVERY key it reads is present in EVERY meta entry.
+    That is what makes the real_bags/*.html failure mode unrepresentable rather
+    than merely fixed: those pages named m.x and m.class_counts while the
+    exporter emitted only {"t", "mse"}, so render(0) threw before play() ever
+    ran and autoplay, telemetry and the legend were all silently dead.
+
+    Keys with no entry in TELEMETRY_SPECS still get a generic descriptor, so a
+    render_fn that starts reporting a new scalar shows up in the panel with no
+    frontend change at all.
+    """
+    if not meta:
+        return []
+    common = set(meta[0])
+    for m in meta[1:]:
+        common &= set(m)
+
+    fields = []
+    for key in TELEMETRY_ORDER:
+        spec = TELEMETRY_SPECS[key]
+        needed = spec.get("from", [key])
+        if all(k in common for k in needed):
+            fields.append({"key": key, **spec})
+
+    described = {k for key in TELEMETRY_ORDER
+                 for k in TELEMETRY_SPECS[key].get("from", [key])}
+    described |= set(TELEMETRY_ORDER)
+    for key in sorted(common - described - set(_COUNT_KEYS)):
+        if isinstance(meta[0][key], (int, float, str)):
+            fields.append({"key": key, "label": key.replace("_", " ").capitalize(),
+                           "format": "auto"})
+    return fields
+
+
+def derive_legend(meta: list[dict], class_ids=(4, 5, 6, 7), caption=None) -> dict | None:
+    """Legend descriptor, or None when no frame carries per-class counts --
+    in which case the player renders no legend block at all rather than an
+    empty one."""
+    if not meta:
+        return None
+    for key in _COUNT_KEYS:
+        if all(key in m for m in meta):
+            return {"source": key, "classIds": list(class_ids),
+                    "caption": caption or "Classes in this frame"}
+    return None
+
+
+def build_playback_payload(*, scenario_id: str, recordings_dir: Path, sim_dir: Path,
+                            max_frames: int | None, upscale: int, render_fn,
+                            frame_sink=None) -> dict:
+    """Frame selection, per-frame render, odometry distance, split attribution
+    and metric aggregation -- everything run_playback does EXCEPT producing
+    HTML. Returns {"frames": [...], "meta": [...], "stats": {...}}.
+
+    frame_sink: optional callable(index, combined_ndarray) -> str. When given,
+    it is called instead of encode_frame() and its return value is collected in
+    place of a base64 string -- the single hook that lets the demo write frames
+    as individual PNG files without a second copy of this loop. When None the
+    behaviour is byte-identical to before this split.
 
     render_fn(npz_path) -> dict with "image" (the frame to encode) plus any
-    scalars to expose in the player's telemetry. Every other key is copied
-    into that frame's metadata verbatim, so a candidate with an extra metric
-    (PointNet++ reports classification accuracy; Kevin's CNN has no
-    classifier and reports none) needs no special case here.
+    scalars to expose as telemetry. Every other key is copied into that frame's
+    metadata verbatim, so a candidate with an extra metric (PointNet++ reports
+    classification accuracy; Kevin's CNN has no classifier and reports none)
+    needs no special case here.
     """
     all_frames = list_scenario_frames(recordings_dir, scenario_id)
     if not all_frames:
@@ -168,7 +236,7 @@ def run_playback(*, scenario_id: str, recordings_dir: Path, sim_dir: Path, out_p
                 return name
         return "unused"  # a real raw scan that simply wasn't in the ~100/scenario subsample
 
-    frames_b64, meta = [], []
+    out_frames, meta = [], []
     t0 = frames[0]["time_ns"]
     prev_x, prev_y = frames[0]["x"], frames[0]["y"]
     cum_dist = 0.0
@@ -176,7 +244,10 @@ def run_playback(*, scenario_id: str, recordings_dir: Path, sim_dir: Path, out_p
 
     for idx, fr in enumerate(frames):
         rendered = render_fn(fr["npz_path"])
-        frames_b64.append(encode_frame(rendered["image"], upscale=upscale))
+        if frame_sink is None:
+            out_frames.append(encode_frame(rendered["image"], upscale=upscale))
+        else:
+            out_frames.append(frame_sink(idx, rendered["image"]))
 
         cum_dist += float(np.hypot(fr["x"] - prev_x, fr["y"] - prev_y))
         prev_x, prev_y = fr["x"], fr["y"]
@@ -195,16 +266,43 @@ def run_playback(*, scenario_id: str, recordings_dir: Path, sim_dir: Path, out_p
 
     duration_s = (frames[-1]["time_ns"] - t0) / 1e9
     print(f"split mix in this playback: {split_counts}")
+    means = {}
     for key in sorted({k for m in meta for k, v in m.items()
                        if isinstance(v, float) and k not in ("t", "x", "y", "dist")}):
-        print(f"mean {key}: {np.mean([m[key] for m in meta]):.4f}")
+        means[key] = float(np.mean([m[key] for m in meta]))
+        print(f"mean {key}: {means[key]:.4f}")
 
-    frames_json = json.dumps({"frames": frames_b64, "meta": meta})
+    return {
+        "frames": out_frames,
+        "meta": meta,
+        "stats": {
+            "n_frames": len(frames), "n_raw_available": len(all_frames),
+            "duration_s": duration_s, "distance_m": cum_dist,
+            "split_counts": split_counts, "means": means,
+        },
+    }
+
+
+def run_playback(*, scenario_id: str, recordings_dir: Path, sim_dir: Path, out_path: Path,
+                  max_frames: int | None, upscale: int, checkpoint_name: str,
+                  render_fn, build_replacements) -> None:
+    """Build a playback payload and write it into the standalone HTML player.
+
+    Kept for the viz/gen_playback_*.py scripts. The demo (demo/build_demo.py)
+    calls build_playback_payload directly and emits JSON instead.
+    """
+    payload = build_playback_payload(
+        scenario_id=scenario_id, recordings_dir=recordings_dir, sim_dir=sim_dir,
+        max_frames=max_frames, upscale=upscale, render_fn=render_fn,
+    )
+    stats = payload["stats"]
+    frames_json = json.dumps({"frames": payload["frames"], "meta": payload["meta"]})
     template = (Path(__file__).resolve().parent / "player_template.html").read_text()
     html = patch_template(template, build_replacements(
-        scenario_id, len(frames), duration_s, cum_dist, checkpoint_name, frames_json))
+        scenario_id, stats["n_frames"], stats["duration_s"], stats["distance_m"],
+        checkpoint_name, frames_json))
     out_path.write_text(html, encoding="utf-8")
-    print(f"wrote {out_path} ({len(html) / 1e6:.2f} MB, {len(frames_b64)} frames)")
+    print(f"wrote {out_path} ({len(html) / 1e6:.2f} MB, {len(payload['frames'])} frames)")
 
 
 def patch_template(template: str, replacements: dict[str, str]) -> str:
