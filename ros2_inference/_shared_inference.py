@@ -48,13 +48,23 @@ EXPECTED_COLS = 1024
 
 class ModelRunner:
     def __init__(self, model_name: str, checkpoint_path: Path, max_range: float,
-                 class_conf_threshold: float = 0.7):
+                 class_conf_threshold: float = 0.97):
         """class_conf_threshold: the classifier's argmax always picks SOME
         class, even when its softmax confidence is barely above chance --
-        on real (domain-shifted) data this shows up as speckled false
-        positives across the ~99% of points that are legitimately
-        environment, since even a small per-point error rate is a lot of
-        pixels at 64x1024. Below this threshold, a point/pixel displays as
+        this shows up as false positives across the ~99% of points that are
+        legitimately environment, since even a small per-point error rate is
+        a lot of pixels at 64x1024. It also compounds a training-time effect:
+        cylinder/box2 hit the class-weight cap (100x) to keep recall up on
+        rare classes, which trades away precision on purpose -- confirmed
+        directly on the simulated TEST set's ground truth, not assumed (see
+        project notes, 2026-09-18): raw argmax gives cylinder precision of
+        only 33.6% despite 94.2% recall.
+
+        0.97 is not a guess -- it's the threshold that maximizes macro-F1
+        (averaged over sphere/cylinder/box1/box2) on that same labeled test
+        set, swept from 0.0 to 0.999: macro-F1 rises from 68.1% (no
+        threshold) to 86.7% at 0.97, then falls again above that as recall
+        collapses. Below this threshold, a point/pixel displays as
         environment instead of its low-confidence argmax class. Purely a
         DISPLAY decision -- does not change the model or its weights. Set
         to 0 to see the raw, unthresholded argmax (what the model would

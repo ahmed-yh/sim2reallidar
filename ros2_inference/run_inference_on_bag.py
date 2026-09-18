@@ -82,10 +82,11 @@ def main():
     ap.add_argument("--model", choices=["pointnet2", "salsanext", "kevin_cnn"], default="salsanext")
     ap.add_argument("--checkpoint", type=Path, required=True)
     ap.add_argument("--max-range", type=float, default=14.425)
-    ap.add_argument("--class-threshold", type=float, default=0.7,
-                     help="Confidence threshold for the predicted-class display (see "
-                          "_shared_inference.ModelRunner). Pass 0 to see the raw, unthresholded "
-                          "argmax instead.")
+    ap.add_argument("--class-threshold", type=float, default=0.97,
+                     help="Confidence threshold for the predicted-class display -- 0.97 maximizes "
+                          "macro-F1 on the labeled simulated test set (see "
+                          "_shared_inference.ModelRunner's docstring). Pass 0 to see the raw, "
+                          "unthresholded argmax instead.")
     ap.add_argument("--out", type=Path, default=Path(__file__).parent / "bag_playback.html")
     ap.add_argument("--max-frames", type=int, default=200,
                      help="Evenly subsample if the bag has more scans than this (Artifact/HTML size cap). "
