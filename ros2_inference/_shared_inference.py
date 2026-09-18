@@ -31,6 +31,7 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "viz"))
 
 from playback_common import class_rgb, label_row, range_rgb  # noqa: E402
+from sensor import N_COLS, N_RINGS  # noqa: E402
 
 # NOT orient()-ed like the simulated-data playbacks (viz/): that flip was
 # verified against the SIMULATED sensor's ring order ("ring 0 = lowest,
@@ -42,33 +43,17 @@ from playback_common import class_rgb, label_row, range_rgb  # noqa: E402
 # grid rendered row-0-at-top is therefore ALREADY correct for real data;
 # applying the simulated flip on top of it was upside down.
 
-EXPECTED_RINGS = 64
-EXPECTED_COLS = 1024
-
 
 class ModelRunner:
     def __init__(self, model_name: str, checkpoint_path: Path, max_range: float,
                  class_conf_threshold: float = 0.97):
-        """class_conf_threshold: the classifier's argmax always picks SOME
-        class, even when its softmax confidence is barely above chance --
-        this shows up as false positives across the ~99% of points that are
-        legitimately environment, since even a small per-point error rate is
-        a lot of pixels at 64x1024. It also compounds a training-time effect:
-        cylinder/box2 hit the class-weight cap (100x) to keep recall up on
-        rare classes, which trades away precision on purpose -- confirmed
-        directly on the simulated TEST set's ground truth, not assumed (see
-        project notes, 2026-09-18): raw argmax gives cylinder precision of
-        only 33.6% despite 94.2% recall.
-
-        0.97 is not a guess -- it's the threshold that maximizes macro-F1
-        (averaged over sphere/cylinder/box1/box2) on that same labeled test
-        set, swept from 0.0 to 0.999: macro-F1 rises from 68.1% (no
-        threshold) to 86.7% at 0.97, then falls again above that as recall
-        collapses. Below this threshold, a point/pixel displays as
-        environment instead of its low-confidence argmax class. Purely a
+        """class_conf_threshold: below this softmax confidence, a point
+        displays as environment instead of its argmax class. Purely a
         DISPLAY decision -- does not change the model or its weights. Set
-        to 0 to see the raw, unthresholded argmax (what the model would
-        literally act on downstream)."""
+        to 0 for the raw argmax (what a downstream consumer would act on).
+
+        0.97 is the macro-F1 peak over the object classes, measured on the
+        labeled test split; see this commit's message for the full sweep."""
         if model_name not in ("pointnet2", "salsanext", "kevin_cnn"):
             raise ValueError(f"unknown model {model_name!r} (expected pointnet2 | salsanext | kevin_cnn)")
         self.model_name = model_name
@@ -157,7 +142,7 @@ class ModelRunner:
         pred_cls_dec = torch.where(conf >= self.class_conf_threshold, pred_cls_dec,
                                     torch.zeros_like(pred_cls_dec))
         pred_cls_dec = pred_cls_dec.cpu().numpy()
-        pred_grid_dec = np.zeros((EXPECTED_RINGS, EXPECTED_COLS // 2), dtype=np.uint8)
+        pred_grid_dec = np.zeros((N_RINGS, N_COLS // 2), dtype=np.uint8)
         pred_grid_dec.reshape(-1)[finite] = pred_cls_dec
         pred_grid = np.repeat(pred_grid_dec, 2, axis=1)
 
@@ -165,7 +150,7 @@ class ModelRunner:
         pred_norm = np.clip(nn_range, 0, self.max_range) / self.max_range
         mse = float(np.mean((real_norm - pred_norm) ** 2))
 
-        gap = np.full((3, EXPECTED_COLS, 3), 10, dtype=np.uint8)
+        gap = np.full((3, N_COLS, 3), 10, dtype=np.uint8)
         combined = np.concatenate([
             label_row(range_rgb(range_native), "ORIGINAL RANGE (real, measured)"), gap,
             label_row(range_rgb(recon_range_grid), "RECONSTRUCTED RANGE"), gap,
@@ -193,7 +178,7 @@ class ModelRunner:
         recon_display = np.where(valid, recon_n * self.max_range, np.nan)
         mse = float(np.mean(((range_n - recon_n) ** 2)[valid])) if valid.any() else 0.0
 
-        gap = np.full((3, EXPECTED_COLS, 3), 10, dtype=np.uint8)
+        gap = np.full((3, N_COLS, 3), 10, dtype=np.uint8)
         combined = np.concatenate([
             label_row(range_rgb(orig_display), "ORIGINAL RANGE (real, measured)"), gap,
             label_row(range_rgb(recon_display), "RECONSTRUCTED RANGE"), gap,
@@ -213,7 +198,7 @@ class ModelRunner:
         recon_display = np.where(valid, recon_n * self.max_range, np.nan)
         mse = float(np.mean(((range_n - recon_n) ** 2)[valid])) if valid.any() else 0.0
 
-        gap = np.full((3, EXPECTED_COLS, 3), 10, dtype=np.uint8)
+        gap = np.full((3, N_COLS, 3), 10, dtype=np.uint8)
         combined = np.concatenate([
             label_row(range_rgb(orig_display), "ORIGINAL RANGE (real, measured)"), gap,
             label_row(range_rgb(recon_display), "RECONSTRUCTED RANGE"),

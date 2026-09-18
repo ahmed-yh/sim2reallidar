@@ -26,28 +26,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from dataset import PointCloudDataset
+from dataset import CLASS_NAMES, PointCloudDataset, pick_samples_per_class
 from models.pointnet2 import PointNet2MultiTask
 
-CLASS_NAMES = {0: "environment", 4: "sphere", 5: "cylinder", 6: "box2", 7: "box1"}
+# matplotlib hex, deliberately NOT viz/playback_common.py's RGB tuples: that
+# palette is tuned for raw-pixel range images on a dark background, this one
+# for scatter points on matplotlib's white default. Only the names are shared.
 CLASS_COLORS = {0: "#c8c8c8", 4: "#1f77b4", 5: "#2ca02c", 6: "#ff7f0e", 7: "#9467bd"}
 RECON_COLOR = "#d62728"
-
-
-def pick_samples_per_class(recordings_dir: Path, test_ids: list[str]) -> dict[int, str]:
-    """For each present object class (4,5,6,7), the test sample containing
-    the most points of that class -- so each plot actually shows the object,
-    not an empty stretch of corridor."""
-    best: dict[int, tuple[str, int]] = {}
-    ds = PointCloudDataset(recordings_dir, test_ids)
-    for i, sample_id in enumerate(test_ids):
-        _, cls = ds[i]
-        cls = cls.numpy()
-        for c in (4, 5, 6, 7):
-            count = int((cls == c).sum())
-            if count > 0 and (c not in best or count > best[c][1]):
-                best[c] = (sample_id, count)
-    return {c: sid for c, (sid, _) in best.items()}
 
 
 def robust_limits(values: np.ndarray, pad_frac: float = 0.2) -> tuple[float, float]:
@@ -67,7 +53,7 @@ def plot_sample(sample_id: str, xyz: np.ndarray, cls: np.ndarray, recon: np.ndar
     for ax, (i1, i2, title) in zip(
         axes, [(0, 1, "top-down (X-Y)"), (0, 2, "side (X-Z)")]
     ):
-        for c in sorted(CLASS_NAMES):
+        for c in sorted(CLASS_COLORS):  # this script's own palette decides what it draws
             m = cls == c
             if not m.any():
                 continue

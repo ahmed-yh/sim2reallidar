@@ -21,9 +21,7 @@ import torch
 from torch.utils.data import Dataset
 
 from dataset import resolve_recording_path
-
-N_RINGS = 64
-N_COLS = 1024
+from sensor import N_COLS, N_RINGS
 
 
 class RangeImageDataset(Dataset):

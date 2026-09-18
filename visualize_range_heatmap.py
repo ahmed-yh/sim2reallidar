@@ -15,8 +15,8 @@ real ray's grid cell -- i.e. "what does the reconstruction show near this ray."
 Picks TEST-split samples (never seen in training or in early-stopping
 decisions) that each contain a lot of one present object class, so the
 object itself -- not just corridor wall -- is visible in the comparison.
-Same selection logic as visualize_reconstruction.py, kept independent here
-rather than shared, since the two scripts produce different plot styles.
+That selection step is dataset.pick_samples_per_class, shared with
+visualize_reconstruction.py; only the plotting below differs between them.
 """
 from __future__ import annotations
 
@@ -29,11 +29,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from dataset import PointCloudDataset, resolve_recording_path
+from dataset import CLASS_NAMES, PointCloudDataset, pick_samples_per_class, resolve_recording_path
 from models.pointnet2 import PointNet2MultiTask
-
-N_RINGS, N_COLS = 64, 1024
-CLASS_NAMES = {4: "sphere", 5: "cylinder", 6: "box2", 7: "box1"}
+from sensor import N_COLS, N_RINGS
 
 
 def load_full_range_grid(npz_path: Path) -> tuple[np.ndarray, np.ndarray]:
@@ -42,22 +40,6 @@ def load_full_range_grid(npz_path: Path) -> tuple[np.ndarray, np.ndarray]:
     rng = np.linalg.norm(xyz, axis=-1)
     rng[~np.isfinite(rng)] = np.nan
     return xyz, rng
-
-
-def pick_samples_per_class(recordings_dir: Path, test_ids: list[str]) -> dict[int, str]:
-    """For each present object class (4,5,6,7), the test sample containing
-    the most points of that class -- so each plot actually shows the object,
-    not an empty stretch of corridor. Same logic as visualize_reconstruction.py."""
-    best: dict[int, tuple[str, int]] = {}
-    ds = PointCloudDataset(recordings_dir, test_ids)
-    for i, sample_id in enumerate(test_ids):
-        _, cls = ds[i]
-        cls = cls.numpy()
-        for c in (4, 5, 6, 7):
-            count = int((cls == c).sum())
-            if count > 0 and (c not in best or count > best[c][1]):
-                best[c] = (sample_id, count)
-    return {c: sid for c, (sid, _) in best.items()}
 
 
 def main():

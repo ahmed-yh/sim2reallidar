@@ -23,10 +23,10 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from sensor import N_COLS, N_RINGS
+
 RING_STRIDE = 1
 COL_STRIDE = 2
-N_RINGS = 64
-N_COLS = 1024
 N_POINTS = (N_RINGS // RING_STRIDE) * (N_COLS // COL_STRIDE)  # 32,768
 
 # Raw laser_retro values that are actually possible per the scenario README:
@@ -35,6 +35,15 @@ N_POINTS = (N_RINGS // RING_STRIDE) * (N_COLS // COL_STRIDE)  # 32,768
 # legitimate value class-index-wise (identical to "car"), just never
 # observed with a *different* meaning than car in this data.
 NUM_CLASSES = 8  # raw indices 0-7
+
+# The one class-index -> name map. Every consumer (evaluate.py, the
+# visualize_*.py scripts, viz/) used to keep its own copy, in some cases a
+# partial one listing only the object classes.
+CLASS_NAMES = {0: "environment", 1: "human", 2: "car", 3: "bus",
+               4: "sphere", 5: "cylinder", 6: "box2", 7: "box1"}
+# human/car/bus never actually spawn in this scenario (confirmed absent from
+# the recordings, see README) -- these four are the only ones ever observed.
+OBJECT_CLASSES = (4, 5, 6, 7)
 
 
 def resolve_recording_path(recordings_dir: Path, sample_id: str) -> Path:
@@ -115,6 +124,24 @@ class PointCloudDataset(Dataset):
         augment_rng = np.random.default_rng() if self.augment else None
         xyz, cls = _load_raw(npz_path, augment_rng=augment_rng)
         return torch.from_numpy(xyz), torch.from_numpy(cls)
+
+
+def pick_samples_per_class(recordings_dir: str | Path, sample_ids: Sequence[str]) -> dict[int, str]:
+    """For each object class actually present, the sample containing the most
+    points of it -- so a plot of that sample actually shows the object rather
+    than an empty stretch of corridor. Used by both visualize_*.py scripts;
+    they render very differently, but "which sample best shows class X" is the
+    same question for both."""
+    best: dict[int, tuple[str, int]] = {}
+    ds = PointCloudDataset(recordings_dir, sample_ids)
+    for i, sample_id in enumerate(sample_ids):
+        _, cls = ds[i]
+        cls = cls.numpy()
+        for c in OBJECT_CLASSES:
+            count = int((cls == c).sum())
+            if count > 0 and (c not in best or count > best[c][1]):
+                best[c] = (sample_id, count)
+    return {c: sid for c, (sid, _) in best.items()}
 
 
 def compute_class_counts(recordings_dir: str | Path, sample_ids: Sequence[str]) -> dict[int, int]:

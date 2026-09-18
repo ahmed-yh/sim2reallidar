@@ -42,7 +42,7 @@ from __future__ import annotations
 
 import numpy as np
 
-N_RINGS = 64
+from sensor import N_RINGS
 
 # Measured no-return (dropout) rate per ring, averaged over 11 real Ouster
 # OS1-64 frames spread across the full bag3 drive (real_bags/bag3_20260910_152806,

@@ -182,7 +182,6 @@ class SetAbstraction(nn.Module):
         self.out_ch = mlp_channels[-1]
 
     def forward(self, xyz: torch.Tensor, points: torch.Tensor | None):
-        B = xyz.shape[0]
         centroid_idx = farthest_point_sample(xyz, self.n_samples)
         centroid_xyz = index_points(xyz, centroid_idx)
         group_idx = ball_query(self.radius, self.k, xyz, centroid_xyz)

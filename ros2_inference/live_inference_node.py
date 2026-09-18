@@ -57,7 +57,7 @@ from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2 as pc2
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _shared_inference import EXPECTED_COLS, EXPECTED_RINGS, ModelRunner  # noqa: E402
+from _shared_inference import N_COLS, N_RINGS, ModelRunner  # noqa: E402
 
 
 def numpy_to_image_msg(arr: np.ndarray, header) -> RosImage:
@@ -114,11 +114,11 @@ class LiveInferenceNode(Node):
         self._warned_shape = False
 
     def on_cloud(self, msg: PointCloud2):
-        if msg.height != EXPECTED_RINGS or msg.width != EXPECTED_COLS:
+        if msg.height != N_RINGS or msg.width != N_COLS:
             if not self._warned_shape:
                 self.get_logger().error(
                     f"Scan shape ({msg.height}x{msg.width}) doesn't match the trained models' "
-                    f"({EXPECTED_RINGS}x{EXPECTED_COLS}). This means your OS1's channel count or "
+                    f"({N_RINGS}x{N_COLS}). This means your OS1's channel count or "
                     f"horizontal-resolution setting doesn't match the simulated training data -- "
                     f"needs resolving (reconfigure the sensor to match, resample the scan, or "
                     f"retrain for your sensor's real shape) before this produces anything "
@@ -128,7 +128,7 @@ class LiveInferenceNode(Node):
             return
 
         pts = pc2.read_points_numpy(msg, field_names=("x", "y", "z"), skip_nans=False)
-        xyz = pts.reshape(EXPECTED_RINGS, EXPECTED_COLS, 3).astype(np.float32)
+        xyz = pts.reshape(N_RINGS, N_COLS, 3).astype(np.float32)
 
         combined, mse = self.runner.run(xyz)
         self.viz_pub.publish(numpy_to_image_msg(combined, msg.header))

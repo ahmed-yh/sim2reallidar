@@ -36,7 +36,7 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "viz"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _shared_inference import EXPECTED_COLS, EXPECTED_RINGS, ModelRunner  # noqa: E402
+from _shared_inference import N_COLS, N_RINGS, ModelRunner  # noqa: E402
 from playback_common import encode_frame, label_row, patch_template  # noqa: E402
 
 
@@ -73,6 +73,28 @@ def iter_pointcloud2(bag_path: Path, topic: str):
             x, y, z = read_field("x"), read_field("y"), read_field("z")
             xyz = np.stack([x, y, z], axis=-1).reshape(height, width, 3).astype(np.float32)
             yield timestamp, height, width, xyz
+
+
+def rendered_frames(all_frames, runner, t0, progress_every):
+    """Yields (index, seconds_since_start, visualization, recon_mse) for every
+    scan whose grid shape matches what the models were trained on, skipping
+    (and warning once about) any that don't. Shared by both output paths --
+    the .mp4 writer and the HTML page differ only in what they do with each
+    rendered frame, not in how one gets produced."""
+    n_shape_mismatch = 0
+    for i, (t_ns, height, width, xyz) in enumerate(all_frames):
+        if height != N_RINGS or width != N_COLS:
+            n_shape_mismatch += 1
+            continue
+        combined, mse = runner.run(xyz)
+        yield i, (t_ns - t0) / 1e9, combined, mse
+        if (i + 1) % progress_every == 0:
+            print(f"  processed {i + 1}/{len(all_frames)}")
+
+    if n_shape_mismatch:
+        print(f"WARNING: skipped {n_shape_mismatch} scans with shape != "
+              f"({N_RINGS},{N_COLS}) -- check your OS1's channel count / "
+              f"horizontal resolution setting.")
 
 
 def main():
@@ -122,49 +144,29 @@ def main():
         print(f"Writing video at {fps:.2f} fps (bag's own scan rate: "
               f"{len(all_frames)} scans over {total_s:.1f}s)")
 
-        writer = None
-        mses = []
-        n_shape_mismatch = 0
-        for i, (t_ns, height, width, xyz) in enumerate(all_frames):
-            if height != EXPECTED_RINGS or width != EXPECTED_COLS:
-                n_shape_mismatch += 1
-                continue
-            combined, mse = runner.run(xyz)
+        writer, mses = None, []
+        for i, t_s, combined, mse in rendered_frames(all_frames, runner, t0, progress_every=50):
             mses.append(mse)
             bar = label_row(np.full((18, combined.shape[1], 3), 14, dtype=np.uint8),
-                             f"t={(t_ns - t0) / 1e9:6.1f}s  frame {i + 1}/{len(all_frames)}  recon mse {mse:.4f}")
+                             f"t={t_s:6.1f}s  frame {i + 1}/{len(all_frames)}  recon mse {mse:.4f}")
             frame = np.concatenate([bar, combined], axis=0)
             if writer is None:
                 h, w = frame.shape[:2]
                 writer = cv2.VideoWriter(str(args.out_video), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
             writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
-            if (i + 1) % 50 == 0:
-                print(f"  processed {i + 1}/{len(all_frames)}")
-        writer.release()
 
-        if n_shape_mismatch:
-            print(f"WARNING: skipped {n_shape_mismatch} scans with shape != "
-                  f"({EXPECTED_RINGS},{EXPECTED_COLS}).")
+        if writer is None:
+            raise SystemExit(f"no scans matched the expected ({N_RINGS},{N_COLS}) shape -- nothing to render")
+        writer.release()
         print(f"mean recon mse (normalized): {np.mean(mses):.4f}")
         print(f"wrote {args.out_video} ({len(mses)} frames @ {fps:.2f}fps)")
         return
 
     frames_b64, meta = [], []
-    n_shape_mismatch = 0
-    for i, (t_ns, height, width, xyz) in enumerate(all_frames):
-        if height != EXPECTED_RINGS or width != EXPECTED_COLS:
-            n_shape_mismatch += 1
-            continue
-        combined, mse = runner.run(xyz)
+    for _i, t_s, combined, mse in rendered_frames(all_frames, runner, t0, progress_every=20):
         frames_b64.append(encode_frame(combined, upscale=2))
-        meta.append({"t": (t_ns - t0) / 1e9, "mse": mse})
-        if (i + 1) % 20 == 0:
-            print(f"  processed {i + 1}/{len(all_frames)}")
+        meta.append({"t": t_s, "mse": mse})
 
-    if n_shape_mismatch:
-        print(f"WARNING: skipped {n_shape_mismatch} scans with shape != "
-              f"({EXPECTED_RINGS},{EXPECTED_COLS}) -- check your OS1's channel count / "
-              f"horizontal resolution setting.")
     if not frames_b64:
         raise SystemExit("no scans matched the expected (64,1024) shape -- nothing to render")
 

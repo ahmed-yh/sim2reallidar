@@ -52,8 +52,7 @@ from dataset import PointCloudDataset, resolve_recording_path  # noqa: E402
 from models.pointnet2 import PointNet2MultiTask  # noqa: E402
 from models.salsanext import SalsaNextMultiTask  # noqa: E402
 from salsanext_dataset import RangeImageDataset  # noqa: E402
-
-N_RINGS, N_COLS = 64, 1024
+from sensor import N_COLS, N_RINGS  # noqa: E402
 
 
 def load_full_range_grid(npz_path: Path) -> np.ndarray:

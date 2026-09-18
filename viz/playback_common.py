@@ -26,13 +26,13 @@ import numpy as np
 from matplotlib import cm
 from PIL import Image, ImageDraw
 
+from sensor import N_COLS, N_RINGS  # noqa: F401  -- re-exported; viz scripts import both from here
+
 CLASS_COLORS = {
     0: (17, 21, 26), 1: (230, 57, 100), 2: (67, 99, 216), 3: (200, 90, 220),
     4: (242, 166, 90), 5: (79, 209, 197), 6: (240, 214, 90), 7: (235, 110, 90),
 }
 RANGE_CLIP_M = 20.0
-N_RINGS = 64
-N_COLS = 1024
 
 
 def orient(grid: np.ndarray) -> np.ndarray:
@@ -134,6 +134,77 @@ def even_subsample(frames: list[dict], max_frames: int | None) -> list[dict]:
         return frames
     idx = np.linspace(0, len(frames) - 1, max_frames).round().astype(int)
     return [frames[i] for i in sorted(set(idx.tolist()))]
+
+
+def run_playback(*, scenario_id: str, recordings_dir: Path, sim_dir: Path, out_path: Path,
+                  max_frames: int | None, upscale: int, checkpoint_name: str,
+                  render_fn, build_replacements) -> None:
+    """Drives one full playback: walk a scenario's scans in time order, render
+    each through `render_fn`, and write the self-contained player page.
+
+    The per-candidate scripts differ only in how a single frame is rendered
+    and what the page is captioned -- everything else (frame selection,
+    odometry distance, train/val/test attribution, template patching) is the
+    same work, so it lives here once instead of in each of them.
+
+    render_fn(npz_path) -> dict with "image" (the frame to encode) plus any
+    scalars to expose in the player's telemetry. Every other key is copied
+    into that frame's metadata verbatim, so a candidate with an extra metric
+    (PointNet++ reports classification accuracy; Kevin's CNN has no
+    classifier and reports none) needs no special case here.
+    """
+    all_frames = list_scenario_frames(recordings_dir, scenario_id)
+    if not all_frames:
+        raise SystemExit(f"no raw scans found for scenario_id={scenario_id} under {recordings_dir}")
+    frames = even_subsample(all_frames, max_frames)
+    print(f"scenario {scenario_id}: {len(all_frames)} raw scans available, using {len(frames)} "
+          f"(the full recording has far more than the ~100/scenario subsample used for training/eval)")
+
+    splits = {s: set(np.load(sim_dir / f"{s}_ids.npy").tolist()) for s in ("train", "val", "test")}
+
+    def split_of(sid: str) -> str:
+        for name in ("test", "val", "train"):
+            if sid in splits[name]:
+                return name
+        return "unused"  # a real raw scan that simply wasn't in the ~100/scenario subsample
+
+    frames_b64, meta = [], []
+    t0 = frames[0]["time_ns"]
+    prev_x, prev_y = frames[0]["x"], frames[0]["y"]
+    cum_dist = 0.0
+    split_counts = {"train": 0, "val": 0, "test": 0, "unused": 0}
+
+    for idx, fr in enumerate(frames):
+        rendered = render_fn(fr["npz_path"])
+        frames_b64.append(encode_frame(rendered["image"], upscale=upscale))
+
+        cum_dist += float(np.hypot(fr["x"] - prev_x, fr["y"] - prev_y))
+        prev_x, prev_y = fr["x"], fr["y"]
+        split = split_of(fr["sample_id"])
+        split_counts[split] += 1
+
+        entry = {"t": (fr["time_ns"] - t0) / 1e9, "x": float(fr["x"]), "y": float(fr["y"]),
+                 "dist": cum_dist, "split": split}
+        entry.update({k: v for k, v in rendered.items() if k != "image"})
+        meta.append(entry)
+
+        if (idx + 1) % 50 == 0:
+            scalars = " ".join(f"{k}={v:.4f}" for k, v in sorted(entry.items())
+                                if isinstance(v, float) and k not in ("t", "x", "y", "dist"))
+            print(f"  rendered {idx + 1}/{len(frames)}  ({scalars})")
+
+    duration_s = (frames[-1]["time_ns"] - t0) / 1e9
+    print(f"split mix in this playback: {split_counts}")
+    for key in sorted({k for m in meta for k, v in m.items()
+                       if isinstance(v, float) and k not in ("t", "x", "y", "dist")}):
+        print(f"mean {key}: {np.mean([m[key] for m in meta]):.4f}")
+
+    frames_json = json.dumps({"frames": frames_b64, "meta": meta})
+    template = (Path(__file__).resolve().parent / "player_template.html").read_text()
+    html = patch_template(template, build_replacements(
+        scenario_id, len(frames), duration_s, cum_dist, checkpoint_name, frames_json))
+    out_path.write_text(html, encoding="utf-8")
+    print(f"wrote {out_path} ({len(html) / 1e6:.2f} MB, {len(frames_b64)} frames)")
 
 
 def patch_template(template: str, replacements: dict[str, str]) -> str:

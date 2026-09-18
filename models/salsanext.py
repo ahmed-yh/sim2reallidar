@@ -49,11 +49,11 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
+from sensor import N_COLS, N_RINGS
+
 LATENT_DIM = 256
 NUM_CLASSES = 8  # matches models/pointnet2.py -- same taxonomy, same data
 IN_CHANNELS = 4  # range, x, y, z -- see module docstring for why not 5
-N_RINGS = 64
-N_COLS = 1024
 
 
 class ResContextBlock(nn.Module):

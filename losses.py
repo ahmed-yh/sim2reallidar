@@ -7,8 +7,6 @@ LiDAR cells carry no signal and must not contribute to either loss).
 """
 from __future__ import annotations
 
-from typing import Callable
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

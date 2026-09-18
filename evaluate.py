@@ -23,12 +23,9 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from dataset import PointCloudDataset
+from dataset import CLASS_NAMES, PointCloudDataset
 from losses import chamfer_distance
 from models.pointnet2 import NUM_CLASSES, PointNet2MultiTask
-
-CLASS_NAMES = {0: "environment", 1: "human", 2: "car", 3: "bus",
-               4: "sphere", 5: "cylinder", 6: "box2", 7: "box1"}
 
 
 def main():

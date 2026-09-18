@@ -51,8 +51,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from dataset import COL_STRIDE, N_COLS, N_POINTS, N_RINGS, RING_STRIDE  # noqa: E402
 from models.pointnet2 import PointNet2MultiTask  # noqa: E402
-from playback_common import (class_rgb, encode_frame, even_subsample, label_row,  # noqa: E402
-                              list_scenario_frames, load_native_grids, orient, patch_template, range_rgb)
+from playback_common import (class_rgb, label_row, load_native_grids, orient,  # noqa: E402
+                              range_rgb, run_playback)
 
 DEC_COLS = N_COLS // COL_STRIDE  # 512
 
@@ -204,67 +204,13 @@ def main():
     model.eval()
     print(f"loaded checkpoint: {args.checkpoint}")
 
-    all_frames = list_scenario_frames(args.recordings_dir, args.scenario_id)
-    if len(all_frames) == 0:
-        raise SystemExit(f"no raw scans found for scenario_id={args.scenario_id} under {args.recordings_dir}")
-    frames = even_subsample(all_frames, args.max_frames or None)
-    print(f"scenario {args.scenario_id}: {len(all_frames)} raw scans available, using {len(frames)} "
-          f"(the full recording has far more than the ~100/scenario subsample used for training/eval)")
-
-    train_ids = set(np.load(args.sim_dir / "train_ids.npy").tolist())
-    val_ids = set(np.load(args.sim_dir / "val_ids.npy").tolist())
-    test_ids = set(np.load(args.sim_dir / "test_ids.npy").tolist())
-
-    def split_of(sid: str) -> str:
-        if sid in test_ids:
-            return "test"
-        if sid in val_ids:
-            return "val"
-        if sid in train_ids:
-            return "train"
-        return "unused"  # a real raw scan that simply wasn't in the ~100/scenario subsample
-
-    frames_b64, meta = [], []
-    t0 = frames[0]["time_ns"]
-    prev_x, prev_y = frames[0]["x"], frames[0]["y"]
-    cum_dist = 0.0
-    split_counts = {"train": 0, "val": 0, "test": 0, "unused": 0}
-
-    for idx, fr in enumerate(frames):
-        sid = fr["sample_id"]
-        r = render_pointnet2_frame(model, device, fr["npz_path"], max_range)
-        frames_b64.append(encode_frame(r["image"], upscale=args.upscale))
-
-        cum_dist += float(np.hypot(fr["x"] - prev_x, fr["y"] - prev_y))
-        prev_x, prev_y = fr["x"], fr["y"]
-        split = split_of(sid)
-        split_counts[split] += 1
-
-        meta.append({
-            "t": (fr["time_ns"] - t0) / 1e9,
-            "x": float(fr["x"]), "y": float(fr["y"]),
-            "dist": cum_dist,
-            "class_counts": r["class_counts"],
-            "split": split,
-            "mse": r["mse"],
-            "acc": r["acc"],
-        })
-        if (idx + 1) % 50 == 0:
-            print(f"  rendered {idx + 1}/{len(frames)}  (mse={r['mse']:.4f} acc={r['acc']*100:.1f}%)")
-
-    duration_s = (frames[-1]["time_ns"] - t0) / 1e9
-    print(f"split mix in this playback: {split_counts}")
-    print(f"mean recon mse: {np.mean([m['mse'] for m in meta]):.4f}, "
-          f"mean class acc: {np.mean([m['acc'] for m in meta]) * 100:.1f}%")
-
-    frames_json = json.dumps({"frames": frames_b64, "meta": meta})
-    template = (Path(__file__).parent / "player_template.html").read_text()
-    replacements = build_replacements(
-        args.scenario_id, len(frames), duration_s, cum_dist, args.checkpoint.name, frames_json,
+    run_playback(
+        scenario_id=args.scenario_id, recordings_dir=args.recordings_dir, sim_dir=args.sim_dir,
+        out_path=args.out, max_frames=args.max_frames or None, upscale=args.upscale,
+        checkpoint_name=args.checkpoint.name,
+        render_fn=lambda npz_path: render_pointnet2_frame(model, device, npz_path, max_range),
+        build_replacements=build_replacements,
     )
-    html = patch_template(template, replacements)
-    args.out.write_text(html, encoding="utf-8")
-    print(f"wrote {args.out} ({len(html) / 1e6:.2f} MB, {len(frames_b64)} frames)")
 
 
 if __name__ == "__main__":

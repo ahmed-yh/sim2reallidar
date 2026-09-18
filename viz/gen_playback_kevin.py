@@ -33,6 +33,7 @@ import torch
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(REPO_ROOT))  # for sensor.py, via playback_common
 
 # masterarbeit_kevinfischer is a SIBLING checkout of sim2reallidar (both
 # live under the same parent directory), not nested inside it -- unlike
@@ -41,13 +42,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # never needed to locate his actual model code before now.
 KEVIN_DEPLOY_DIR = (REPO_ROOT.parent / "masterarbeit_kevinfischer" / "lidar_preprocessing"
                      / "autoencoder_training" / "denkwelt_deploy")
+# Inserted LAST so it lands FIRST: Kevin's deploy dir has its own top-level
+# `models` package, and this repo's is now also importable (REPO_ROOT above).
+# His has to win here, since `build_autoencoder` below is his.
 sys.path.insert(0, str(KEVIN_DEPLOY_DIR))
 
 from models.autoencoder import build_autoencoder  # noqa: E402
-from playback_common import (class_rgb, encode_frame, even_subsample, label_row,  # noqa: E402
-                              list_scenario_frames, load_native_grids, orient, patch_template, range_rgb)
-
-N_RINGS, N_COLS = 64, 1024
+from playback_common import (N_COLS, N_RINGS, class_rgb, label_row, load_native_grids,  # noqa: E402
+                              orient, range_rgb, run_playback)
 
 
 def render_kevin_frame(model, device, npz_path, max_range) -> dict:
@@ -126,6 +128,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenario-id", default="122e86f0-8b3f-46f5-8eaa-9f6b1232c7df")
     ap.add_argument("--kevin-outputs-dir", type=Path, default=REPO_ROOT / "outputs" / "kevin_cnn")
+    ap.add_argument("--recordings-dir", type=Path,
+                     default=REPO_ROOT / "scenario_data" / "mbut_76scenarios" / "o_robot_nav")
     ap.add_argument("--sim-dir", type=Path, default=REPO_ROOT / "data" / "sim")
     ap.add_argument("--out", type=Path, default=Path(__file__).parent / "kevin_playback.html")
     ap.add_argument("--max-frames", type=int, default=160,
@@ -154,66 +158,13 @@ def main():
     model.eval()
     print(f"loaded checkpoint: {args.kevin_outputs_dir / 'best_autoencoder.pt'}")
 
-    recordings_dir = REPO_ROOT / "scenario_data" / "mbut_76scenarios" / "o_robot_nav"
-    all_frames = list_scenario_frames(recordings_dir, args.scenario_id)
-    if len(all_frames) == 0:
-        raise SystemExit(f"no raw scans found for scenario_id={args.scenario_id} under {recordings_dir}")
-    frames = even_subsample(all_frames, args.max_frames or None)
-    print(f"scenario {args.scenario_id}: {len(all_frames)} raw scans available, using {len(frames)} "
-          f"(the full recording has far more than the ~100/scenario subsample used for training/eval)")
-
-    train_ids = set(np.load(args.sim_dir / "train_ids.npy").tolist())
-    val_ids = set(np.load(args.sim_dir / "val_ids.npy").tolist())
-    test_ids = set(np.load(args.sim_dir / "test_ids.npy").tolist())
-
-    def split_of(sid: str) -> str:
-        if sid in test_ids:
-            return "test"
-        if sid in val_ids:
-            return "val"
-        if sid in train_ids:
-            return "train"
-        return "unused"  # a real raw scan that simply wasn't in the ~100/scenario subsample
-
-    frames_b64, meta = [], []
-    t0 = frames[0]["time_ns"]
-    prev_x, prev_y = frames[0]["x"], frames[0]["y"]
-    cum_dist = 0.0
-    split_counts = {"train": 0, "val": 0, "test": 0, "unused": 0}
-
-    for idx, fr in enumerate(frames):
-        sid = fr["sample_id"]
-        r = render_kevin_frame(model, device, fr["npz_path"], max_range)
-        frames_b64.append(encode_frame(r["image"], upscale=args.upscale))
-
-        cum_dist += float(np.hypot(fr["x"] - prev_x, fr["y"] - prev_y))
-        prev_x, prev_y = fr["x"], fr["y"]
-        split = split_of(sid)
-        split_counts[split] += 1
-
-        meta.append({
-            "t": (fr["time_ns"] - t0) / 1e9,
-            "x": float(fr["x"]), "y": float(fr["y"]),
-            "dist": cum_dist,
-            "class_counts": r["class_counts"],
-            "split": split,
-            "mse": r["mse"],
-        })
-        if (idx + 1) % 50 == 0:
-            print(f"  rendered {idx + 1}/{len(frames)}  (mse={r['mse']:.4f})")
-
-    duration_s = (frames[-1]["time_ns"] - t0) / 1e9
-    print(f"split mix in this playback: {split_counts}")
-    print(f"mean recon mse: {np.mean([m['mse'] for m in meta]):.4f}")
-
-    frames_json = json.dumps({"frames": frames_b64, "meta": meta})
-    template = (Path(__file__).parent / "player_template.html").read_text()
-    replacements = build_replacements(
-        args.scenario_id, len(frames), duration_s, cum_dist, "best_autoencoder.pt", frames_json,
+    run_playback(
+        scenario_id=args.scenario_id, recordings_dir=args.recordings_dir, sim_dir=args.sim_dir,
+        out_path=args.out, max_frames=args.max_frames or None, upscale=args.upscale,
+        checkpoint_name="best_autoencoder.pt",
+        render_fn=lambda npz_path: render_kevin_frame(model, device, npz_path, max_range),
+        build_replacements=build_replacements,
     )
-    html = patch_template(template, replacements)
-    args.out.write_text(html, encoding="utf-8")
-    print(f"wrote {args.out} ({len(html) / 1e6:.2f} MB, {len(frames_b64)} frames)")
 
 
 if __name__ == "__main__":
