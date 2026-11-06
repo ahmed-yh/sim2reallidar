@@ -1,12 +1,14 @@
-# Training-machine requirements (Quadro RTX 5000, standard x86_64 CUDA install).
+# Training-machine requirements (Quadro RTX 5000, standard x86_64 CUDA install), and enough
+# to run the test suite on any machine, CPU only.
 #
 # The Jetson AGX Orin deployment target does NOT use this file -- plain
 # `pip install torch` does not work on Jetson (PyPI wheels are x86_64 only;
-# Jetson is aarch64 with a JetPack-pinned CUDA/PyTorch build). See README
-# "Running on the Jetson" for the correct install path there.
+# Jetson is aarch64 with a JetPack-pinned CUDA/PyTorch build). See
+# docs/deployment.md for the install path there.
 
 torch>=2.0
 numpy>=1.24
 pandas>=2.0
 pytest>=7.0
-opencv-python-headless>=4.8  # ros2_inference/run_inference_on_bag.py --out-video mp4 writing
+matplotlib>=3.7   # viz/playback_common.py, imported by ros2_inference/ and its tests
+pillow>=10.0      # same

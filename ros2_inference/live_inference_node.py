@@ -14,15 +14,21 @@ no-ROS2-needed equivalent for reading recorded bags) -- this file is just
 the ROS2 plumbing around that shared logic.
 
 Publishes a live visualization image (sensor_msgs/Image, rgb8) on
---viz-topic so reconstruction/classification quality can be watched in
-rqt_image_view or RViz2's Image display while driving -- this is the
-"qualitative visual comparison" the project README lists as a planned but
-not-yet-implemented mitigation for having no ground truth on real data.
-Don't mistake the predicted-class row for a validated result -- it's the
-model's own guess, with nothing to check it against here.
+viz_topic so reconstruction/classification quality can be watched in
+rqt_image_view or RViz2's Image display while driving. Don't mistake the
+predicted-class row for a validated result -- it's the model's own guess,
+with nothing to check it against here.
 
-    ros2 run <your_package> live_inference_node.py --ros-args \\
-        -p model:=salsanext -p checkpoint:=/path/to/best_multitask_model.pt
+The repo is not an ament package, so start the script directly from a
+sourced ROS2 shell (rclpy reads the --ros-args from sys.argv):
+
+    python3 ros2_inference/live_inference_node.py --ros-args \\
+        -p model:=pointnet2 -p checkpoint:=/path/to/epoch39_multitask_model.pt
+
+The checkpoint is a FULL multitask model (encoder + both decoders), since
+the visualization needs the decoders. To produce only the 256-d observation,
+use deploy.ScanEncoder with the shipped encoder weights instead.
+See docs/deployment.md for every parameter.
 
 This node itself has NOT run on the robot -- this development machine has no
 ROS2 install (`import rclpy` fails here). The per-scan logic it calls has
