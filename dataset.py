@@ -10,7 +10,7 @@ train/val/test split (data/sim/{train,val,test}_ids.npy) applies unchanged.
 
 Decimation: full ring resolution (all 64 rings) + every 2nd azimuth column ->
 64 x 512 = 32,768 points. This specific axis choice (decimate azimuth, never
-rings) is not arbitrary -- see README "Why decimate azimuth, not rings" for
+rings) is not arbitrary -- see docs/data.md "Point budget" for
 the empirical class-coverage comparison that justifies it.
 """
 from __future__ import annotations
@@ -42,7 +42,7 @@ NUM_CLASSES = 8  # raw indices 0-7
 CLASS_NAMES = {0: "environment", 1: "human", 2: "car", 3: "bus",
                4: "sphere", 5: "cylinder", 6: "box2", 7: "box1"}
 # human/car/bus never actually spawn in this scenario (confirmed absent from
-# the recordings, see README) -- these four are the only ones ever observed.
+# the recordings, see docs/data.md) -- these four are the only ones ever observed.
 OBJECT_CLASSES = (4, 5, 6, 7)
 
 
@@ -170,7 +170,7 @@ def compute_class_counts(recordings_dir: str | Path, sample_ids: Sequence[str]) 
     """Per-class point counts over the GIVEN split, after the same decimation
     the model actually trains on -- used for loss weighting (losses.py). Must
     be computed on the decimated distribution, not the full-resolution one:
-    decimation itself changes per-class visibility (see README), so weights
+    decimation itself changes per-class visibility (see docs/data.md), so weights
     calibrated on full-res data would be calibrated for a distribution the
     model never actually sees."""
     recordings_dir = Path(recordings_dir)

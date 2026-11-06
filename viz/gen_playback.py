@@ -1,7 +1,7 @@
 """Generate viz/mbut_playback.html from the parsed scan data.
 
 Reads data/sim/ (must exist first -- run data_prep/parse_recordings.py +
-split.py, see README), renders every scan in poses.csv as a small combined
+split.py, see docs/data.md), renders every scan in poses.csv as a small combined
 range+class image (downsampled to 512px wide), and injects the resulting
 frame data into player_template.html (the static HTML/CSS/JS player shell)
 to produce the final self-contained mbut_playback.html.

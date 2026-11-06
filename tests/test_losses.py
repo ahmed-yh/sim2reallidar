@@ -45,7 +45,7 @@ def test_chamfer_distance_target_subsampling_is_close_to_full():
 def test_compute_class_weights_handles_zero_count_class():
     # human/car/bus (indices 1,2,3) have ZERO examples in the real scenario
     # -- this is not a hypothetical edge case, it's the actual data (see
-    # README). A naive inverse-frequency weight would divide by zero.
+    # docs/data.md). A naive inverse-frequency weight would divide by zero.
     counts = {0: 1_000_000, 4: 100, 5: 50, 6: 80, 7: 150}  # 1,2,3 absent
     weights = compute_class_weights(counts, num_classes=8, cap=100.0)
     assert torch.isfinite(weights).all()

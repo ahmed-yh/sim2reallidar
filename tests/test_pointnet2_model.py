@@ -27,8 +27,8 @@ def test_encoder_output_shape():
 
 
 def test_encoder_param_count_stays_small():
-    # Canary: this is the ONLY thing that ships to the Jetson (see README
-    # "What actually deploys"). If someone accidentally grows the encoder
+    # Canary: this is the ONLY thing that ships to the Jetson (see docs/deployment.md
+    # "Only the encoder deploys"). If someone accidentally grows the encoder
     # by an order of magnitude, this should fail loudly rather than only
     # showing up as a surprise on-device.
     enc = PointNet2Encoder()
@@ -52,7 +52,7 @@ def test_reconstruction_decoder_shape():
 
 def test_reconstruction_decoder_depends_only_on_latent_not_raw_input():
     # The whole point of NOT giving this decoder skip connections (see
-    # README "Why two decoders, and why they're structurally different") is
+    # docs/training-and-evaluation.md "Why the two PointNet++ decoders differ") is
     # that its output is a pure, deterministic function of z alone -- no
     # side-channel back to the original points. Two properties together
     # establish that: (1) its forward signature structurally accepts only

@@ -3,10 +3,9 @@ resemble the real input scene, not just score well on Chamfer distance?
 
 Same idea as the CNN/VAE candidates' "decode the bottleneck and compare to
 the original recording" check, adapted to point clouds -- there's no 2D
-image for this candidate to reconstruct (see README "Why raw points, not
-the range grid"), so instead this plots the real input point cloud and the
+image for this candidate to reconstruct (see docs/data.md "Point budget"), so instead this plots the real input point cloud and the
 latent-only reconstruction (ReconstructionDecoder(z), no skip connections --
-see README "Why two decoders") from a top-down and side view.
+see docs/training-and-evaluation.md) from a top-down and side view.
 
     python3 visualize_reconstruction.py
 

@@ -4,7 +4,7 @@ image" test, adapted for PointNet++'s free-form point output.
 The CNN decoder outputs directly in the (64, 1024) range-image grid, so
 comparing two heatmaps pixel-for-pixel is natural there. PointNet++'s
 ReconstructionDecoder outputs 2,048 unordered XYZ points with no ring/azimuth
-identity (deliberate -- see README, this is what makes it a real test of the
+identity (deliberate -- see docs/training-and-evaluation.md, this is what makes it a real test of the
 latent rather than a grid-shaped shortcut). To get a directly comparable
 heatmap, each real ray's true 3D position is nearest-neighbor matched against
 the reconstructed point cloud, and that neighbor's range is plotted in the

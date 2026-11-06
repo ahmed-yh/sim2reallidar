@@ -1,7 +1,7 @@
 """Train the PointNet++ candidate.
 
 Run on the training machine (Quadro RTX 5000 or equivalent) -- NOT on the
-Jetson (inference-only deployment target, see README) and NOT expected to
+Jetson (inference-only deployment target, see docs/deployment.md) and NOT expected to
 run a real training job on a CPU-only dev machine (correctness can be
 smoke-tested there; actual training cannot).
 
@@ -134,7 +134,7 @@ def main():
             f"CUDA out of memory at batch_size={args.batch_size}. This has not been benchmarked "
             f"on real training hardware yet -- retry with --batch-size 1, and if that still OOMs, "
             f"reduce --chamfer-target-subsample first (cheaper than reducing point count, which "
-            f"would break the train/inference decimation symmetry documented in README)."
+            f"would break the train/inference decimation symmetry documented in docs/data.md)."
         )
 
     print(f"\nBest val loss: {es.best_val_loss:.5f}")
@@ -143,7 +143,7 @@ def main():
     )
     print(f"Held-out validation: recon {held_out_recon:.5f}, class {held_out_class:.5f}")
 
-    # Only the encoder ever deploys (see README "What actually deploys") --
+    # Only the encoder ever deploys (see docs/deployment.md) --
     # saved separately from the full model, which is kept only for
     # inspection/resuming, matching the existing CNN baseline's convention.
     torch.save(model.encoder.state_dict(), args.outputs_dir / "best_encoder.pt")

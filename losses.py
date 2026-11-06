@@ -50,7 +50,7 @@ def compute_class_weights(class_counts: dict[int, int], num_classes: int,
       destabilize training -- one rare-class pixel outweighing thousands of
       ordinary ones in a single batch.
     - A class with ZERO examples (human/car/bus -- confirmed absent from this
-      recording, see README) would otherwise divide by zero and produce inf,
+      recording, see docs/data.md) would otherwise divide by zero and produce inf,
       which is silently catastrophic the moment anything touches the full
       weight vector (normalizing it, logging it, etc.), even though no
       individual training step ever selects that class as a target.

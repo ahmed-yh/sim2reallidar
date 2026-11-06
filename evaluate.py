@@ -12,7 +12,7 @@ Reports:
 - Per-point classification: overall accuracy (inflated by ~99% environment
   points, reported for context only) and per-class recall/precision/F1, which
   is the metric that actually matters given the extreme class imbalance
-  (see README "The data").
+  (see docs/data.md).
 
 --class-conf-threshold applies the same display rule the ROS2 inference path
 uses (_shared_inference.ModelRunner): a point keeps its predicted object class
