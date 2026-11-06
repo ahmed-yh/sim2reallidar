@@ -1,39 +1,11 @@
-"""Chapter 5 (Implementation) figures, generated from real project data only.
+"""Charts for the thesis, generated from project data only.
 
-Run:  python thesis_figures/make_thesis_figures.py
+    python thesis_figures/make_thesis_figures.py
 
-PROVENANCE -- read this before using any output in the thesis.
-
-Every number plotted here is traced to a file on disk. Nothing is estimated,
-interpolated or invented. Where the underlying data does not exist on this
-machine, the figure says so on its face rather than being filled in with a
-plausible-looking curve.
-
-  Figure 1  drift fix comparison
-      SOURCE: the thesis PDF's own Chapter 5 prose (Sections 5.2.5, 5.3.2,
-      5.3.4 and its Figure 5.4) -- i.e. already-aggregated summary statistics.
-      NOT raw logs: the jackal-tunnel-slam / jackal-slam-to-mesh repository is
-      NOT present on this machine (searched C:, D:, E:), so there is no
-      odom_covariance_debug.py, no tools/diag_*.py and no per-message CSV to
-      re-run or load. Consequently this figure contains NO per-step time
-      series, NO X-Y trajectory plot and NO jump-vs-rotation-rate scatter --
-      all three need per-message data that is not here. See MISSING_PANELS.
-
-  Figure 2  reconstructed point cloud
-      SOURCE: sim2reallidar/noslil.ply -- 482,757 points, x/y/z +
-      scalar_intensity, written by CloudCompare v2.14.alpha on 2026-09-19.
-      This is the SLAM point cloud exported from the KISS-Matcher pipeline.
-      Extent and downsampled counts are measured from the file at run time.
-
-  Figure 3  observation-encoder comparison
-      SOURCE: outputs/measured/fair_comparison.json  (written by
-      kevin_pipeline/fair_comparison.py) and outputs/measured/
-      evaluate_pointnet2.json (written by evaluate.py --json-out).
-      NO per-epoch training curves are plotted, because none exist: fit() in
-      train_utils.py passes each epoch to a log_fn that only print()s to
-      stdout, and every outputs/*/train_metrics.json holds final scalars only
-      (held_out_val_recon, held_out_val_class, best_val_loss) with no history
-      array. No .log or .csv capture of a training run exists in the repo.
+Each figure function reads its numbers from the source named in thesis_figures/README.md, and
+returns without writing when that source is not on the machine. Figures 1, 2, 3 and 5 appear in
+the thesis; 6 and 7 chart the threshold sweep and the classifier comparison, which the thesis
+gives as tables.
 """
 from __future__ import annotations
 
@@ -257,8 +229,8 @@ def figure_1_drift():
     axC.set_xticks([1e0, 1e2, 1e4])
     axC.xaxis.set_major_formatter(FuncFormatter(fmt_tick))
     axC.xaxis.set_minor_formatter(FuncFormatter(lambda *_: ""))
-    axC.axvline(300, color=C_ACCENT, linewidth=1.1, linestyle=(0, (4, 3)))
-    axC.text(300, len(names) - 0.42, " corridor\n ~300 m", fontsize=7,
+    axC.axvline(125, color=C_ACCENT, linewidth=1.1, linestyle=(0, (4, 3)))
+    axC.text(125, len(names) - 0.42, " corridor\n ~125 m", fontsize=7,
              color=C_ACCENT, va="top", ha="left")
     for y, v, c in zip(ypos, vals, cols):
         axC.text(v * 2.2, y, fmt_m(v), va="center", ha="left",
@@ -552,99 +524,6 @@ def figure_3_encoders():
     return p
 
 
-# ============================================================ FIGURE 4 =====
-# §5.7.2 End-to-End Verification. The thesis reports these as prose only.
-# Measured on the real Jetson AGX Orin by benchmarks/pointnet2_jetson_bench.py,
-# PointNet2Encoder in isolation, single-scan batches.
-JETSON = [
-    # points, latency_ms, rate_hz, peak_mem_mb
-    (2_048,    242, 4.1,    156),
-    (4_096,    470, 2.1,    156),
-    (8_192,   1015, 1.0,    881),
-    (16_384,  2260, 0.4,   3584),
-    (32_768,  5378, 0.2,  14336),
-]
-CHOSEN_POINTS = 32_768
-SENSOR_HZ = 10.0
-
-
-def figure_4_jetson():
-    pts = np.array([r[0] for r in JETSON], dtype=float)
-    lat = np.array([r[1] for r in JETSON], dtype=float)
-    mem = np.array([r[3] for r in JETSON], dtype=float)
-
-    fig = plt.figure(figsize=(7.6, 3.9))
-    gs = fig.add_gridspec(1, 3, width_ratios=[1.25, 1.25, 1.1],
-                          left=0.085, right=0.985, top=0.70, bottom=0.235,
-                          wspace=0.42)
-
-    axA = fig.add_subplot(gs[0, 0])
-    axA.plot(pts, lat, "-o", color=C_BEFORE, linewidth=1.8, markersize=4.5)
-    axA.axhline(1000 / SENSOR_HZ, color=C_ACCENT, linewidth=1.1, linestyle=(0, (4, 3)))
-    axA.text(2100, 1000 / SENSOR_HZ * 1.25, f"sensor rate ({SENSOR_HZ:g} Hz = 100 ms)",
-             fontsize=7, color=C_ACCENT, va="bottom")
-    # Direct end-of-line label instead of a boxed legend.
-    axA.text(pts[-1] * 1.12, lat[-1], "latency", fontsize=8.5, fontweight="bold",
-             color=C_BEFORE, va="center")
-    axA.set_xscale("log"); axA.set_yscale("log")
-    axA.set_xlim(1700, 90_000); axA.set_ylim(60, 12_000)
-    axA.set_xticks(pts); axA.set_xticklabels([f"{int(p/1024)}k" for p in pts], fontsize=7.5)
-    axA.set_xlabel("points per scan", fontsize=8.5)
-    axA.set_ylabel("ms per inference", fontsize=8.5)
-    axA.set_title("Inference latency", fontsize=9, color=INK, loc="left", pad=7)
-    clean(axA)
-
-    axB = fig.add_subplot(gs[0, 1])
-    axB.plot(pts, mem / 1024, "-o", color=C_AFTER, linewidth=1.8, markersize=4.5)
-    axB.text(pts[-1] * 1.12, mem[-1] / 1024, "peak\nmemory", fontsize=8.5,
-             fontweight="bold", color=C_AFTER, va="center")
-    axB.axhline(64, color=MUTED, linewidth=1.0, linestyle=(0, (4, 3)))
-    axB.text(2100, 64 * 1.1, "Orin has 64 GB", fontsize=7, color=MUTED, va="bottom")
-    axB.set_xscale("log"); axB.set_yscale("log")
-    axB.set_xlim(1700, 90_000); axB.set_ylim(0.1, 160)
-    axB.set_xticks(pts); axB.set_xticklabels([f"{int(p/1024)}k" for p in pts], fontsize=7.5)
-    axB.set_xlabel("points per scan", fontsize=8.5)
-    axB.set_ylabel("GB", fontsize=8.5)
-    axB.set_title("Peak memory", fontsize=9, color=INK, loc="left", pad=7)
-    clean(axB)
-
-    for ax in (axA, axB):
-        ax.axvline(CHOSEN_POINTS, color=INK, linewidth=0.8, alpha=0.25)
-        # A log axis keeps its own decade ticks alongside any explicit
-        # set_xticks, so both label sets render on top of each other.
-        ax.xaxis.set_minor_locator(plt.NullLocator())
-        ax.xaxis.set_minor_formatter(plt.NullFormatter())
-
-    axC = fig.add_subplot(gs[0, 2])
-    summary_panel(axC, [
-        ("Chosen point budget", "32,768", True, C_AFTER),
-        ("Latency there", "5,378 ms (0.2 Hz)", False, None),
-        ("Peak memory there", "14.0 GB", False, None),
-        None,
-        ("Slower than the sensor by", f"{5378 / (1000/SENSOR_HZ):.0f}x", True, C_BEFORE),
-        ("Robot speed (measured)", "0.38 m/s", False, None),
-        ("Travel between predictions", "~2.0 m", True, None),
-        ("Corridor width", "<2 m", False, None),
-    ], header="At the chosen budget")
-
-    titles(fig,
-           "Real-time feasibility on the Jetson AGX Orin",
-           "PointNet2Encoder alone, single-scan batches, measured on the target hardware. No configuration reaches the\n"
-           "sensor's 10 Hz rate — but the CPU-only SLAM stage does not consume the classifier's output, so they need not match.",
-           x=0.02, y=0.975, sub_dy=0.068)
-
-    fig.text(0.02, 0.020,
-             "Source: benchmarks/pointnet2_jetson_bench.py, run on the real Orin; values as reported in thesis §5.7.2. Measured BEFORE the determinism and\n"
-             "ball-query fixes — those replace a masked array operation with an equivalent unmasked one rather than changing the algorithm, so the timings are\n"
-             "not expected to move, but this has not been re-confirmed on the current code.",
-             fontsize=6.4, color=MUTED, ha="left", va="bottom")
-
-    p = OUT / "fig4_jetson_realtime.png"
-    fig.savefig(p, dpi=DPI, bbox_inches="tight")
-    plt.close(fig)
-    return p
-
-
 # ============================================================ FIGURE 5 =====
 # §5.6.4 Decimation Validation. Thesis Table 5.1, as a figure -- four classes
 # across four configurations is hard to read as numbers in a row.
@@ -720,7 +599,7 @@ def figure_5_decimation():
            x=0.02, y=0.975, sub_dy=0.066)
 
     fig.text(0.02, 0.028,
-             "Source: thesis §5.6.4 / Table 5.1, measured against the full recording by the decimation-validation tooling; also stated in README.md. "
+             "Source: thesis §5.6.4 / Table 5.1, measured against the full recording by the decimation-validation tooling; also in docs/data.md. "
              "Percentages are the table's\nframe counts out of 600 recorded frames. The baseline is no decimation at all, not a competing strategy.",
              fontsize=6.4, color=MUTED, ha="left", va="bottom")
 
@@ -948,7 +827,7 @@ def figure_7_classifiers():
 if __name__ == "__main__":
     made = []
     for fn in (figure_1_drift, figure_2_cloud, figure_3_encoders,
-               figure_4_jetson, figure_5_decimation, figure_6_threshold,
+               figure_5_decimation, figure_6_threshold,
                figure_7_classifiers):
         p = fn()
         if p:

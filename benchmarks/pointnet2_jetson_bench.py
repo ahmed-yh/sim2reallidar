@@ -1,8 +1,7 @@
 """Benchmark the REAL PointNet2Encoder at several input point-count budgets.
 
 Run this ON THE JETSON, after installing the JetPack-matched PyTorch wheel
-(plain `pip install torch` does not work on Jetson -- see README "Running on
-the Jetson"):
+(plain `pip install torch` does not work on Jetson -- see docs/deployment.md):
 
     python3 benchmarks/pointnet2_jetson_bench.py
 
@@ -11,7 +10,7 @@ farthest-point-sampling and ball-query, written before models/pointnet2.py
 existed. That copy had two real bugs (sentinel-index leakage when a centroid
 has zero neighbors in radius; a crash when N < k) later found and fixed by
 the test suite, in the shared models/pointnet2_utils.py -- see git history /
-README for the story. This script now imports PointNet2Encoder directly, so
+docs/training-and-evaluation.md for the story. This script now imports PointNet2Encoder directly, so
 it benchmarks the exact class that ships to the Jetson, not an approximation
 of it, and can never drift out of sync with a second, untested copy again.
 
