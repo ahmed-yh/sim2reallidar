@@ -1,0 +1,39 @@
+{
+  "held_out_val_recon": 0.0007300951299584357,
+  "held_out_val_class": 0.042542097874377904,
+  "best_val_loss": 0.04327219300433634,
+  "class_counts": {
+    "0": 343680053,
+    "4": 846028,
+    "5": 656340,
+    "7": 2113148,
+    "6": 1090594
+  },
+  "class_weights": [
+    0.1267116665840149,
+    100.0,
+    100.0,
+    100.0,
+    51.473793029785156,
+    66.35016632080078,
+    39.930782318115234,
+    20.608243942260742
+  ],
+  "latent_dim": 256,
+  "max_range": 14.425209045410156,
+  "args": {
+    "recordings_dir": "C:\\Users\\ahmed\\Desktop\\pointnettrain\\sim2reallidar\\scenario_data\\mbut_76scenarios\\o_robot_nav",
+    "splits_dir": "C:\\Users\\ahmed\\Desktop\\pointnettrain\\sim2reallidar\\data\\sim",
+    "outputs_dir": "outputs\\salsanext_noise_finetuned",
+    "kevin_outputs_dir": "C:\\Users\\ahmed\\Desktop\\pointnettrain\\sim2reallidar\\outputs\\kevin_cnn",
+    "batch_size": 16,
+    "lr": 3e-05,
+    "max_epochs": 40,
+    "patience": 10,
+    "lambda_class": 1.0,
+    "num_workers": 4,
+    "weight_cap": 100.0,
+    "init_from": "outputs\\salsanext\\best_multitask_model.pt",
+    "augment_noise": true
+  }
+}

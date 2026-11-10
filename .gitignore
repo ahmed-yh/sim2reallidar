@@ -5,6 +5,8 @@ __pycache__/
 # ...except the one trained artifact that deploys: the PointNet++ encoder
 # (1.4 MB). Everything else -- full multitask models, fine-tunes -- stays local.
 !/weights/*.pt
+# ...and the trained checkpoints mirrored from outputs/ (see checkpoints/README.md)
+!/checkpoints/**/*.pt
 
 # NOTE: the big-data excludes below are ROOT-ANCHORED (leading "/") on purpose.
 # Unanchored, "data/" matches any directory named data at any depth -- which

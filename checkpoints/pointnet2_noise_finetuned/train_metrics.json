@@ -1,0 +1,39 @@
+{
+  "held_out_val_recon": 0.2747288907829084,
+  "held_out_val_class": 0.09689531410174249,
+  "best_val_loss": 0.37228890244599855,
+  "class_counts": {
+    "0": 171964655,
+    "4": 423228,
+    "7": 1063427,
+    "5": 328570,
+    "6": 545880
+  },
+  "class_weights": [
+    0.1267162710428238,
+    100.0,
+    100.0,
+    100.0,
+    51.48695373535156,
+    66.31986999511719,
+    39.91851806640625,
+    20.49103546142578
+  ],
+  "n_points": 32768,
+  "latent_dim": 256,
+  "args": {
+    "recordings_dir": "C:\\Users\\ahmed\\Desktop\\pointnettrain\\sim2reallidar\\scenario_data\\mbut_76scenarios\\o_robot_nav",
+    "splits_dir": "C:\\Users\\ahmed\\Desktop\\pointnettrain\\sim2reallidar\\data\\sim",
+    "outputs_dir": "outputs\\pointnet2_noise_finetuned",
+    "batch_size": 2,
+    "lr": 3e-05,
+    "max_epochs": 15,
+    "patience": 5,
+    "lambda_class": 1.0,
+    "chamfer_target_subsample": 4096,
+    "num_workers": 4,
+    "weight_cap": 100.0,
+    "init_from": "outputs\\pointnet2_checkpoints\\epoch39_multitask_model.pt",
+    "augment_noise": true
+  }
+}

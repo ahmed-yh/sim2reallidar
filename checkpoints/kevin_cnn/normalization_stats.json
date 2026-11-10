@@ -1,0 +1,10 @@
+{
+  "max_range": 14.425209045410156,
+  "percentile": 99.0,
+  "n_total": 7600,
+  "n_train": 5320,
+  "n_val": 1140,
+  "n_test": 1140,
+  "seed": null,
+  "source": "reused sim2reallidar/data/sim/{train,val,test}_ids.npy, not Kevin's own random split"
+}
