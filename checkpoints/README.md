@@ -10,7 +10,7 @@ This joins the SalsaNext files, which are stored as 90 MB parts because GitHub r
 
 | Folder | What it is | Settings |
 |---|---|---|
-| `pointnet2_checkpoints/` | **PointNet++ epoch 39, the model behind every thesis result** (simulation benchmark, Jetson profile, real-bag inference). `epoch39_encoder.pt` is the same file as `weights/pointnet2_epoch39_encoder.pt`. | 76 scenarios; Adam, lr 1e-4, batch 2, λ_class 1.0, Chamfer target 4,096 points, class-weight cap 100 |
+| `pointnet2_checkpoints/` | **PointNet++ epoch 39, the model behind every thesis result** (simulation benchmark and real-bag inference). `epoch39_encoder.pt` is the same file as `weights/pointnet2_epoch39_encoder.pt`. | 76 scenarios; Adam, lr 1e-4, batch 2, λ_class 1.0, Chamfer target 4,096 points, class-weight cap 100 |
 | `salsanext/` | SalsaNext reimplementation, the second candidate | 76 scenarios; lr 1e-3, batch 16, up to 100 epochs, patience 8; best val loss 0.0431 |
 | `pointnet2_noise_finetuned/` | Epoch 39 fine-tuned with synthetic real-sensor noise | lr 3e-5, up to 15 epochs, patience 5 |
 | `pointnet2_ringnoise_finetuned/` | Epoch 39 fine-tuned with the measured per-ring dropout | Same as above. The dropout profile was applied upside down (fixed in `real_noise_augment.py` on 2026-09-28), so treat this run as inconclusive |
@@ -40,4 +40,4 @@ In every folder:
 - `*_encoder.pt` is the encoder alone, which is all that deploys.
 - `*_multitask_model.pt` adds the decoders (reconstruction and segmentation) and is what evaluation and the inference videos load.
 
-`thesis_figures/THESIS_CORRECTIONS.md` explains why both noise fine-tunes count as inconclusive: they were judged on real scans fed in the wrong point order.
+Both noise fine-tunes count as inconclusive: they were judged on real scans fed in the wrong point order, and the ring-noise run used the dropout profile upside down. [docs/continuing.md](../docs/continuing.md) has redoing them as an open item. The README's section 6 covers the training options.

@@ -29,6 +29,7 @@ section tells you what the command needs and what files it produces. The pages i
 | train PointNet++ | `python train.py` | [3](#3-train-pointnet) |
 | train SalsaNext | `python train_salsanext.py` | [4](#4-train-salsanext) |
 | train the CNN autoencoder | Kevin Fischer's `train_ae.py` | [5](#5-train-the-cnn-autoencoder) |
+| restore the trained thesis checkpoints into `outputs/` | `python checkpoints/join_parts.py` | [1](#1-set-up-a-new-machine) |
 | continue from a trained model, or fine-tune with real-sensor noise | `python train.py --init-from ...` | [6](#6-continue-from-a-trained-model) |
 | score a trained model on the test split | `python evaluate.py --checkpoint ...` | [7](#7-score-a-model-on-the-test-split) |
 | compare the three models on one scale | `python kevin_pipeline/fair_comparison.py` | [8](#8-compare-the-three-models) |
@@ -59,7 +60,7 @@ some_folder/
 ├── sim2reallidar/                  this repository
 │   ├── scenario_data/              raw Gazebo recordings (from the group)
 │   ├── data/                       made by section 2
-│   ├── outputs/                    checkpoints and results (made by training, or copied)
+│   ├── outputs/                    checkpoints and results (made by training, or restored from checkpoints/)
 │   ├── real_bags/                  real ROS2 bags (from the group)
 │   └── noslil.ply, 2.ply           tunnel geometry, only for the demo page
 └── masterarbeit_kevinfischer/      Kevin Fischer's repository, only for the CNN autoencoder
@@ -87,14 +88,22 @@ python -m pytest tests/ -q                                   # expect: 53 passed
 python -c "import torch; print(torch.cuda.is_available())"   # expect: True on a GPU machine
 ```
 
-To reproduce the thesis results without retraining, also copy these checkpoints from the group
-into `outputs/`:
+To reproduce the thesis results without retraining, restore the trained checkpoints that ship in
+`checkpoints/`:
 
-| file | model |
-|---|---|
-| `outputs/pointnet2_checkpoints/epoch39_multitask_model.pt` | PointNet++ used for every thesis result |
-| `outputs/salsanext/best_multitask_model.pt` | SalsaNext |
-| `outputs/kevin_cnn/best_autoencoder.pt` and `test_metrics.json` | CNN autoencoder and its test scores |
+```bash
+python checkpoints/join_parts.py
+```
+
+This puts every PointNet++ and SalsaNext run of the thesis into `outputs/` and checks each file
+against `checkpoints/SHA256SUMS`. That includes:
+- `outputs/pointnet2_checkpoints/epoch39_multitask_model.pt`, the PointNet++ used for every thesis
+  result;
+- `outputs/salsanext/best_multitask_model.pt`.
+
+[checkpoints/README.md](checkpoints/README.md) lists what each run is. The CNN autoencoder's
+`outputs/kevin_cnn/best_autoencoder.pt` and `test_metrics.json` are not in the repository; get
+them from the group.
 
 ## 2. Build the training dataset
 
@@ -415,8 +424,8 @@ points. Never pass a scan to the encoder model directly.
 ## 12. Ship a new encoder
 
 1. Copy the encoder of your run into the repo under a new name:
-   `outputs/pointnet2_mydata/best_encoder.pt` to `weights/my_encoder.pt`. `weights/` is the only
-   folder where `.pt` files are tracked by git.
+   `outputs/pointnet2_mydata/best_encoder.pt` to `weights/my_encoder.pt`. Apart from
+   `checkpoints/`, `weights/` is the only folder where `.pt` files are tracked by git.
 2. In `deploy.py`, point `DEFAULT_WEIGHTS` at the new file, and do the same for `WEIGHTS` in
    `tests/test_shipped_weights.py`.
 3. Run `python -m pytest tests/ -q`.
@@ -551,6 +560,7 @@ sim2reallidar/
 ├── data_prep/              parse_recordings.py, split.py
 ├── kevin_pipeline/         prepare_data.py, fair_comparison.py
 ├── weights/                pointnet2_epoch39_encoder.pt
+├── checkpoints/            every trained thesis run; join_parts.py restores them into outputs/
 ├── ros2_inference/         offline bag runner, live ROS2 node, their shared per-scan code
 ├── real_eval/              persistent-object map, before/after evidence for the input fix
 ├── benchmarks/             encoder cost estimate, on-device benchmark
